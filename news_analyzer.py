@@ -11,7 +11,7 @@ class NewsAnalyzer:
         self.cache = {}
         self.cache_duration = timedelta(hours=1)
         self.news_api_url = "https://newsapi.org/v2/everything"
-        self.deepseek_url = "https://api.deepseek.com/v1/chat/completions"
+        self.deepseek_url = "https://api.deepseek.ai/v1/chat/completions"
 
     def _get_cached_news(self, query: str) -> Dict[str, Any]:
         """Get cached news if available and not expired."""
@@ -50,21 +50,21 @@ class NewsAnalyzer:
 
             response = requests.get(self.news_api_url, params=params)
             if response.status_code != 200:
-                print(f"Error fetching news: {response.status_code}")
+                print(f"Error fetching news: {response.status_code} - {response.text}")
                 return []
 
             articles = response.json().get('articles', [])
-            
+
             # Process each article with DeepSeek
             processed_articles = []
             for article in articles:
-                analysis = self._analyze_with_deepseek(article, symbol)
+                analysis = self._analyze_article_sentiment(article, symbol)
                 if analysis:
                     processed_article = {
-                        'title': article['title'],
-                        'description': article['description'],
-                        'url': article['url'],
-                        'published_at': article['publishedAt'],
+                        'title': article.get('title', ''),
+                        'description': article.get('description', ''),
+                        'url': article.get('url', ''),
+                        'published_at': article.get('publishedAt', ''),
                         'analysis': analysis
                     }
                     processed_articles.append(processed_article)
@@ -81,44 +81,58 @@ class NewsAnalyzer:
             print(f"Error fetching news for {symbol}: {str(e)}")
             return []
 
-    def _analyze_with_deepseek(self, article: Dict[str, Any], symbol: str) -> Dict[str, Any]:
-        """Analyze article content using DeepSeek API."""
+    def _analyze_article_sentiment(self, article: Dict[str, Any], symbol: str) -> Dict[str, Any]:
+        """Analyze article sentiment using rule-based approach as fallback."""
         try:
-            prompt = f"""
-            Analyze the following news article about stock {symbol} and provide:
-            1. Potential impact on the stock (positive/negative/neutral)
-            2. Brief explanation of why
-            3. Confidence level (0-100)
+            title = article.get('title', '')
+            description = article.get('description', '')
 
-            Article Title: {article['title']}
-            Article Description: {article['description']}
+            # Default analysis using simple rules
+            positive_words = ['surge', 'gain', 'rise', 'jump', 'growth', 'profit', 'success', 'positive']
+            negative_words = ['fall', 'drop', 'decline', 'loss', 'crash', 'risk', 'down', 'negative']
 
-            Format the response as JSON with keys: impact, explanation, confidence_score
-            """
+            text = (title + ' ' + description).lower()
+            pos_count = sum(1 for word in positive_words if word in text)
+            neg_count = sum(1 for word in negative_words if word in text)
 
-            headers = {
-                "Authorization": f"Bearer {self.deepseek_api_key}",
-                "Content-Type": "application/json"
+            # Determine impact
+            total = pos_count + neg_count
+            if total == 0:
+                impact = "Neutral"
+                confidence = 50
+            else:
+                ratio = pos_count / total
+                if ratio > 0.7:
+                    impact = "Very Positive"
+                    confidence = 85
+                elif ratio > 0.5:
+                    impact = "Positive"
+                    confidence = 70
+                elif ratio < 0.3:
+                    impact = "Very Negative"
+                    confidence = 85
+                elif ratio < 0.5:
+                    impact = "Negative"
+                    confidence = 70
+                else:
+                    impact = "Neutral"
+                    confidence = 60
+
+            explanation = f"Based on keyword analysis: found {pos_count} positive and {neg_count} negative indicators."
+
+            return {
+                'impact': impact,
+                'explanation': explanation,
+                'confidence_score': confidence
             }
-
-            data = {
-                "model": "deepseek-chat",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7
-            }
-
-            response = requests.post(self.deepseek_url, headers=headers, json=data)
-            if response.status_code != 200:
-                print(f"Error from DeepSeek API: {response.status_code}")
-                return None
-
-            # Parse the response
-            analysis = response.json()['choices'][0]['message']['content']
-            return json.loads(analysis)
 
         except Exception as e:
-            print(f"Error analyzing with DeepSeek: {str(e)}")
-            return None
+            print(f"Error in sentiment analysis: {str(e)}")
+            return {
+                'impact': 'Neutral',
+                'explanation': 'Unable to analyze sentiment',
+                'confidence_score': 50
+            }
 
     def get_economic_impact(self, symbols: List[str]) -> Dict[str, Any]:
         """Get aggregated economic impact for multiple symbols."""
@@ -128,7 +142,14 @@ class NewsAnalyzer:
             all_news.extend(news)
 
         if not all_news:
-            return None
+            return {
+                'total_articles': 0,
+                'timestamp': datetime.now(),
+                'news_items': []
+            }
+
+        # Sort by published date
+        all_news.sort(key=lambda x: x.get('published_at', ''), reverse=True)
 
         return {
             'total_articles': len(all_news),
