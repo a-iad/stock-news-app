@@ -104,6 +104,52 @@ with col2:
         </div>
         """, unsafe_allow_html=True)
 
+    # Economic News Impact
+    st.subheader("Economic News Impact")
+    economic_news = market_data.get_economic_news()
+
+    if economic_news:
+        st.write(f"Analyzing {economic_news['total_articles']} recent news items")
+        for news_item in economic_news['news_items']:
+            with st.expander(f"📰 {news_item['title'][:100]}..."):
+                st.write(news_item['description'])
+                analysis = news_item['analysis']
+
+                # Create columns for analysis details
+                col_news1, col_news2 = st.columns(2)
+                with col_news1:
+                    st.metric("Impact", analysis['impact'])
+                    st.metric("Confidence", f"{analysis['confidence_score']}%")
+                with col_news2:
+                    st.write("Analysis:", analysis['explanation'])
+
+                st.caption(f"Published: {news_item['published_at']}")
+                st.markdown(f"[Read more]({news_item['url']})")
+
+    # Individual Stock News
+    if not st.session_state.portfolio.holdings.empty:
+        st.subheader("Stock-Specific News")
+        for _, position in st.session_state.portfolio.holdings.iterrows():
+            symbol = position['Symbol']
+            news = market_data.get_news_analysis(symbol)
+
+            if news:
+                with st.expander(f"📊 Latest News for {symbol}"):
+                    for news_item in news[:3]:  # Show top 3 news items
+                        st.markdown(f"**{news_item['title']}**")
+                        st.write(news_item['description'])
+
+                        # Show analysis results
+                        col_stock1, col_stock2 = st.columns(2)
+                        with col_stock1:
+                            st.metric("Market Impact", news_item['analysis']['impact'])
+                        with col_stock2:
+                            st.write("Analysis:", news_item['analysis']['explanation'])
+
+                        st.caption(f"Confidence: {news_item['analysis']['confidence_score']}%")
+                        st.markdown(f"[Read full article]({news_item['url']})")
+                        st.markdown("---")
+
     # Individual Stock Sentiment
     if not st.session_state.portfolio.holdings.empty:
         st.subheader("Portfolio Sentiment Analysis")
@@ -120,6 +166,7 @@ with col2:
                     with col_sent2:
                         st.metric("Sentiment Score", f"{sentiment['average_sentiment']:.2f}")
                         st.caption(f"Last updated: {sentiment['timestamp'].strftime('%Y-%m-%d %H:%M')}")
+
 
 # Alerts section
 st.header("Market Alerts")

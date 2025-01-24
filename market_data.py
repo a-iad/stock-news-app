@@ -3,11 +3,13 @@ import pandas as pd
 from datetime import datetime, timedelta
 from predictions import MarketPredictor
 from sentiment_analyzer import SentimentAnalyzer
+from news_analyzer import NewsAnalyzer
 
 class MarketData:
     def __init__(self):
         self.predictor = MarketPredictor()
         self.sentiment_analyzer = SentimentAnalyzer()
+        self.news_analyzer = NewsAnalyzer()
 
     @staticmethod
     def get_stock_data(symbol, period='1mo'):
@@ -119,3 +121,34 @@ class MarketData:
             }
         ]
         return pd.DataFrame(events)
+
+    def get_news_analysis(self, symbol):
+        """Get news analysis for a stock."""
+        try:
+            print(f"Fetching news analysis for {symbol}")
+            ticker = yf.Ticker(symbol)
+            company_name = ticker.info.get('longName')
+            news = self.news_analyzer.fetch_relevant_news(symbol, company_name)
+            if news:
+                print(f"Found {len(news)} relevant news items for {symbol}")
+            else:
+                print(f"No news found for {symbol}")
+            return news
+        except Exception as e:
+            print(f"Error fetching news analysis for {symbol}: {str(e)}")
+            return None
+
+    def get_economic_news(self):
+        """Get overall economic news impact."""
+        try:
+            print("Fetching economic news impact")
+            major_symbols = ['^GSPC', '^DJI', 'AAPL', 'MSFT', 'GOOGL']
+            news_impact = self.news_analyzer.get_economic_impact(major_symbols)
+            if news_impact:
+                print(f"Found {news_impact['total_articles']} economic news items")
+            else:
+                print("No economic news found")
+            return news_impact
+        except Exception as e:
+            print(f"Error fetching economic news: {str(e)}")
+            return None
