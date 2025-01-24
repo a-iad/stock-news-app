@@ -11,28 +11,37 @@ class SentimentAnalyzer:
 
     def clean_text(self, text):
         """Clean text by removing special characters and extra whitespace."""
+        if not text:
+            return ""
         text = re.sub(r'[^A-Za-z0-9\s]', ' ', text)
         return ' '.join(text.split())
 
     def get_sentiment_score(self, text):
         """Get sentiment score for a piece of text."""
+        if not text:
+            return 0.0
         analysis = TextBlob(self.clean_text(text))
         return analysis.sentiment.polarity
 
     def analyze_market_sentiment(self, symbol, cache_ok=True):
         """Analyze market sentiment for a given symbol using news headlines."""
         try:
+            print(f"\nAnalyzing sentiment for {symbol}")
+
             # Check cache first
             if cache_ok and symbol in self.cache:
                 cached_result = self.cache[symbol]
                 if datetime.now() - cached_result['timestamp'] < self.cache_duration:
+                    print(f"Using cached sentiment for {symbol}")
                     return cached_result
 
             # Fetch news using yfinance
+            print(f"Fetching news for {symbol}")
             ticker = yf.Ticker(symbol)
             news = ticker.news
 
             if not news:
+                print(f"No news found for {symbol}")
                 return {
                     'symbol': symbol,
                     'average_sentiment': 0,
@@ -42,6 +51,7 @@ class SentimentAnalyzer:
                 }
 
             # Analyze sentiment of headlines and descriptions
+            print(f"Analyzing {len(news)} news items for {symbol}")
             sentiments = []
             for item in news:
                 headline = item.get('title', '')
@@ -49,11 +59,17 @@ class SentimentAnalyzer:
 
                 # Combine headline and description for better context
                 full_text = f"{headline} {description}"
-                sentiment = self.get_sentiment_score(full_text)
-                sentiments.append(sentiment)
+                if full_text.strip():
+                    sentiment = self.get_sentiment_score(full_text)
+                    sentiments.append(sentiment)
+
+            if not sentiments:
+                print(f"No valid sentiment data for {symbol}")
+                return None
 
             # Calculate average sentiment
-            avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
+            avg_sentiment = sum(sentiments) / len(sentiments)
+            print(f"Average sentiment for {symbol}: {avg_sentiment:.2f}")
 
             # Determine sentiment direction
             if avg_sentiment > 0.2:
@@ -80,12 +96,13 @@ class SentimentAnalyzer:
             return result
 
         except Exception as e:
-            print(f"Error analyzing market sentiment: {str(e)}")
+            print(f"Error analyzing market sentiment for {symbol}: {str(e)}")
             return None
 
     def get_market_mood(self, symbols):
         """Get overall market mood based on multiple symbols."""
         try:
+            print("\nAnalyzing overall market mood")
             sentiments = []
             for symbol in symbols:
                 sentiment = self.analyze_market_sentiment(symbol)
@@ -93,10 +110,12 @@ class SentimentAnalyzer:
                     sentiments.append(sentiment)
 
             if not sentiments:
+                print("No valid sentiment data for market mood")
                 return None
 
             # Calculate average market sentiment
             avg_market_sentiment = sum(s['average_sentiment'] for s in sentiments) / len(sentiments)
+            print(f"Overall market sentiment: {avg_market_sentiment:.2f}")
 
             return {
                 'market_sentiment': avg_market_sentiment,

@@ -48,12 +48,32 @@ class MarketData:
 
     def get_sentiment_analysis(self, symbol):
         """Get sentiment analysis for a stock."""
-        return self.sentiment_analyzer.analyze_market_sentiment(symbol)
+        try:
+            print(f"Fetching sentiment analysis for {symbol}")
+            sentiment = self.sentiment_analyzer.analyze_market_sentiment(symbol)
+            if sentiment:
+                print(f"Sentiment analysis successful for {symbol}: {sentiment['sentiment_direction']}")
+            else:
+                print(f"No sentiment data available for {symbol}")
+            return sentiment
+        except Exception as e:
+            print(f"Error in sentiment analysis for {symbol}: {str(e)}")
+            return None
 
     def get_market_sentiment(self):
         """Get overall market sentiment."""
-        major_symbols = ['^GSPC', '^DJI', 'AAPL', 'MSFT', 'GOOGL']
-        return self.sentiment_analyzer.get_market_mood(major_symbols)
+        try:
+            print("Fetching overall market sentiment")
+            major_symbols = ['^GSPC', '^DJI', 'AAPL', 'MSFT', 'GOOGL']
+            sentiment = self.sentiment_analyzer.get_market_mood(major_symbols)
+            if sentiment:
+                print(f"Market sentiment analysis successful: {sentiment['market_sentiment']:.2f}")
+            else:
+                print("No market sentiment data available")
+            return sentiment
+        except Exception as e:
+            print(f"Error in market sentiment analysis: {str(e)}")
+            return None
 
     @staticmethod
     def get_market_indicators():
