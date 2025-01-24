@@ -25,16 +25,27 @@ st.title("Portfolio Impact Analysis Dashboard")
 # Sidebar for portfolio management
 with st.sidebar:
     st.header("Portfolio Management")
-    
+
     # Add position form
     with st.form("add_position"):
         symbol = st.text_input("Stock Symbol").upper()
         shares = st.number_input("Number of Shares", min_value=0.0)
         price = st.number_input("Entry Price", min_value=0.0)
-        
+
         if st.form_submit_button("Add Position"):
             st.session_state.portfolio.add_position(symbol, shares, price)
             st.success(f"Added {shares} shares of {symbol}")
+
+    # Portfolio positions with remove buttons
+    st.subheader("Current Positions")
+    for idx, position in st.session_state.portfolio.holdings.iterrows():
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write(f"{position['Symbol']}: {position['Shares']} shares")
+        with col2:
+            if st.button("Remove", key=f"remove_{position['Symbol']}"):
+                st.session_state.portfolio.remove_position(position['Symbol'])
+                st.rerun()
 
 # Main dashboard
 col1, col2 = st.columns([2, 1])

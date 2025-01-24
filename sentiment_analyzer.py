@@ -11,16 +11,19 @@ class SentimentAnalyzer:
 
     def clean_text(self, text):
         """Clean text by removing special characters and extra whitespace."""
-        if not text:
+        if not isinstance(text, str):
             return ""
         text = re.sub(r'[^A-Za-z0-9\s]', ' ', text)
         return ' '.join(text.split())
 
     def get_sentiment_score(self, text):
         """Get sentiment score for a piece of text."""
+        if not text or not isinstance(text, str):
+            return 0.0
+        text = self.clean_text(text)
         if not text:
             return 0.0
-        analysis = TextBlob(self.clean_text(text))
+        analysis = TextBlob(text)
         return analysis.sentiment.polarity
 
     def analyze_market_sentiment(self, symbol, cache_ok=True):
@@ -38,34 +41,35 @@ class SentimentAnalyzer:
             # Fetch news using yfinance
             print(f"Fetching news for {symbol}")
             ticker = yf.Ticker(symbol)
-            news = ticker.news
+            news = ticker.news or []
 
-            if not news:
-                print(f"No news found for {symbol}")
+            # Process headlines and descriptions
+            print(f"Analyzing {len(news)} news items for {symbol}")
+            sentiments = []
+
+            for item in news:
+                headline = str(item.get('title', ''))
+                description = str(item.get('description', ''))
+
+                # Process each text piece separately for better granularity
+                if headline:
+                    sentiment = self.get_sentiment_score(headline)
+                    sentiments.append(sentiment * 1.5)  # Headlines weighted more
+
+                if description:
+                    sentiment = self.get_sentiment_score(description)
+                    sentiments.append(sentiment)
+
+            # If no valid sentiments found, return neutral sentiment
+            if not sentiments:
+                print(f"No valid sentiment data for {symbol}")
                 return {
                     'symbol': symbol,
                     'average_sentiment': 0,
-                    'news_count': 0,
+                    'news_count': len(news),
                     'sentiment_direction': 'Neutral',
                     'timestamp': datetime.now()
                 }
-
-            # Analyze sentiment of headlines and descriptions
-            print(f"Analyzing {len(news)} news items for {symbol}")
-            sentiments = []
-            for item in news:
-                headline = item.get('title', '')
-                description = item.get('description', '')
-
-                # Combine headline and description for better context
-                full_text = f"{headline} {description}"
-                if full_text.strip():
-                    sentiment = self.get_sentiment_score(full_text)
-                    sentiments.append(sentiment)
-
-            if not sentiments:
-                print(f"No valid sentiment data for {symbol}")
-                return None
 
             # Calculate average sentiment
             avg_sentiment = sum(sentiments) / len(sentiments)
