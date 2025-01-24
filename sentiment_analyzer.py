@@ -13,18 +13,30 @@ class SentimentAnalyzer:
         """Clean text by removing special characters and extra whitespace."""
         if not isinstance(text, str):
             return ""
-        text = re.sub(r'[^A-Za-z0-9\s]', ' ', text)
+        # Remove URLs
+        text = re.sub(r'http\S+|www.\S+', '', text, flags=re.MULTILINE)
+        # Remove special characters but keep punctuation for better sentiment analysis
+        text = re.sub(r'[^A-Za-z0-9\s.,!?]', ' ', text)
+        # Remove extra whitespace
         return ' '.join(text.split())
 
     def get_sentiment_score(self, text):
         """Get sentiment score for a piece of text."""
-        if not text or not isinstance(text, str):
+        try:
+            if not text or not isinstance(text, str):
+                return 0.0
+
+            text = self.clean_text(text)
+            if not text:
+                return 0.0
+
+            analysis = TextBlob(text)
+            # Combine polarity and subjectivity for a more nuanced score
+            score = analysis.sentiment.polarity * (1 + analysis.sentiment.subjectivity)
+            return score
+        except Exception as e:
+            print(f"Error in sentiment scoring: {str(e)}")
             return 0.0
-        text = self.clean_text(text)
-        if not text:
-            return 0.0
-        analysis = TextBlob(text)
-        return analysis.sentiment.polarity
 
     def analyze_market_sentiment(self, symbol, cache_ok=True):
         """Analyze market sentiment for a given symbol using news headlines."""
@@ -36,7 +48,7 @@ class SentimentAnalyzer:
                 cached_result = self.cache[symbol]
                 if datetime.now() - cached_result['timestamp'] < self.cache_duration:
                     print(f"Using cached sentiment for {symbol}")
-                    return cached_result
+                    return cached_result['data']
 
             # Fetch news using yfinance
             print(f"Fetching news for {symbol}")
@@ -46,62 +58,88 @@ class SentimentAnalyzer:
             # Process headlines and descriptions
             print(f"Analyzing {len(news)} news items for {symbol}")
             sentiments = []
+            news_items = []
 
             for item in news:
-                headline = str(item.get('title', ''))
-                description = str(item.get('description', ''))
+                try:
+                    headline = str(item.get('title', ''))
+                    description = str(item.get('description', ''))
 
-                # Process each text piece separately for better granularity
-                if headline:
-                    sentiment = self.get_sentiment_score(headline)
-                    sentiments.append(sentiment * 1.5)  # Headlines weighted more
+                    # Store news items for reference
+                    news_items.append({
+                        'headline': headline,
+                        'description': description,
+                        'timestamp': item.get('providerPublishTime', '')
+                    })
 
-                if description:
-                    sentiment = self.get_sentiment_score(description)
-                    sentiments.append(sentiment)
+                    # Process headline (weighted more heavily)
+                    if headline:
+                        headline_score = self.get_sentiment_score(headline)
+                        sentiments.append(headline_score * 1.5)  # Headlines weighted more
 
-            # If no valid sentiments found, return neutral sentiment
-            if not sentiments:
-                print(f"No valid sentiment data for {symbol}")
-                return {
-                    'symbol': symbol,
-                    'average_sentiment': 0,
-                    'news_count': len(news),
-                    'sentiment_direction': 'Neutral',
-                    'timestamp': datetime.now()
-                }
+                    # Process description
+                    if description:
+                        desc_score = self.get_sentiment_score(description)
+                        sentiments.append(desc_score)
 
-            # Calculate average sentiment
-            avg_sentiment = sum(sentiments) / len(sentiments)
-            print(f"Average sentiment for {symbol}: {avg_sentiment:.2f}")
+                except Exception as e:
+                    print(f"Error processing news item: {str(e)}")
+                    continue
 
-            # Determine sentiment direction
-            if avg_sentiment > 0.2:
-                direction = 'Very Positive'
-            elif avg_sentiment > 0:
-                direction = 'Positive'
-            elif avg_sentiment < -0.2:
-                direction = 'Very Negative'
-            elif avg_sentiment < 0:
-                direction = 'Negative'
-            else:
-                direction = 'Neutral'
+            # Calculate sentiment metrics
+            result = self._calculate_sentiment_metrics(symbol, sentiments, news_items)
 
-            result = {
-                'symbol': symbol,
-                'average_sentiment': avg_sentiment,
-                'news_count': len(news),
-                'sentiment_direction': direction,
+            # Cache the result
+            self.cache[symbol] = {
+                'data': result,
                 'timestamp': datetime.now()
             }
 
-            # Cache the result
-            self.cache[symbol] = result
+            print(f"Sentiment analysis completed for {symbol}: {result['sentiment_direction']}")
             return result
 
         except Exception as e:
-            print(f"Error analyzing market sentiment for {symbol}: {str(e)}")
-            return None
+            print(f"Error in market sentiment analysis for {symbol}: {str(e)}")
+            return self._get_neutral_sentiment(symbol)
+
+    def _calculate_sentiment_metrics(self, symbol, sentiments, news_items):
+        """Calculate sentiment metrics from collected scores."""
+        if not sentiments:
+            return self._get_neutral_sentiment(symbol)
+
+        avg_sentiment = sum(sentiments) / len(sentiments)
+
+        # Determine sentiment direction with more granular categories
+        if avg_sentiment > 0.3:
+            direction = 'Very Positive'
+        elif avg_sentiment > 0.1:
+            direction = 'Positive'
+        elif avg_sentiment < -0.3:
+            direction = 'Very Negative'
+        elif avg_sentiment < -0.1:
+            direction = 'Negative'
+        else:
+            direction = 'Neutral'
+
+        return {
+            'symbol': symbol,
+            'average_sentiment': avg_sentiment,
+            'news_count': len(news_items),
+            'sentiment_direction': direction,
+            'timestamp': datetime.now(),
+            'news_items': news_items[:5]  # Store last 5 news items
+        }
+
+    def _get_neutral_sentiment(self, symbol):
+        """Return neutral sentiment for cases with no data."""
+        return {
+            'symbol': symbol,
+            'average_sentiment': 0,
+            'news_count': 0,
+            'sentiment_direction': 'Neutral',
+            'timestamp': datetime.now(),
+            'news_items': []
+        }
 
     def get_market_mood(self, symbols):
         """Get overall market mood based on multiple symbols."""
@@ -117,13 +155,22 @@ class SentimentAnalyzer:
                 print("No valid sentiment data for market mood")
                 return None
 
-            # Calculate average market sentiment
-            avg_market_sentiment = sum(s['average_sentiment'] for s in sentiments) / len(sentiments)
+            # Calculate weighted market sentiment
+            total_weight = sum(s['news_count'] for s in sentiments)
+            if total_weight == 0:
+                avg_market_sentiment = 0
+            else:
+                avg_market_sentiment = sum(
+                    s['average_sentiment'] * s['news_count'] 
+                    for s in sentiments
+                ) / total_weight
+
             print(f"Overall market sentiment: {avg_market_sentiment:.2f}")
 
             return {
                 'market_sentiment': avg_market_sentiment,
                 'analyzed_symbols': len(sentiments),
+                'total_news_analyzed': total_weight,
                 'timestamp': datetime.now()
             }
 
