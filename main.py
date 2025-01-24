@@ -77,6 +77,50 @@ with col2:
     for name, value in indicators.items():
         st.metric(name, f"{value:,.2f}")
 
+    # Market Sentiment Analysis
+    st.subheader("Market Sentiment Analysis")
+    market_sentiment = market_data.get_market_sentiment()
+
+    if market_sentiment:
+        sentiment_score = market_sentiment['market_sentiment']
+
+        # Create a color scale based on sentiment
+        if sentiment_score > 0.2:
+            sentiment_color = "green"
+        elif sentiment_score > 0:
+            sentiment_color = "lightgreen"
+        elif sentiment_score < -0.2:
+            sentiment_color = "red"
+        elif sentiment_score < 0:
+            sentiment_color = "pink"
+        else:
+            sentiment_color = "gray"
+
+        st.markdown(f"""
+        <div style='padding: 10px; background-color: {sentiment_color}; border-radius: 5px;'>
+            <h4>Overall Market Sentiment</h4>
+            <p>Score: {sentiment_score:.2f}</p>
+            <p>Based on {market_sentiment['analyzed_symbols']} major market symbols</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Individual Stock Sentiment
+    if not st.session_state.portfolio.holdings.empty:
+        st.subheader("Portfolio Sentiment Analysis")
+        for _, position in st.session_state.portfolio.holdings.iterrows():
+            symbol = position['Symbol']
+            sentiment = market_data.get_sentiment_analysis(symbol)
+
+            if sentiment:
+                with st.expander(f"Sentiment Analysis for {symbol}"):
+                    col_sent1, col_sent2 = st.columns(2)
+                    with col_sent1:
+                        st.metric("Sentiment Direction", sentiment['sentiment_direction'])
+                        st.metric("News Count", sentiment['news_count'])
+                    with col_sent2:
+                        st.metric("Sentiment Score", f"{sentiment['average_sentiment']:.2f}")
+                        st.caption(f"Last updated: {sentiment['timestamp'].strftime('%Y-%m-%d %H:%M')}")
+
 # Alerts section
 st.header("Market Alerts")
 col3, col4 = st.columns([1, 2])

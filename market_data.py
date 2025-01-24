@@ -2,10 +2,12 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 from predictions import MarketPredictor
+from sentiment_analyzer import SentimentAnalyzer
 
 class MarketData:
     def __init__(self):
         self.predictor = MarketPredictor()
+        self.sentiment_analyzer = SentimentAnalyzer()
 
     @staticmethod
     def get_stock_data(symbol, period='1mo'):
@@ -43,6 +45,15 @@ class MarketData:
         except Exception as e:
             print(f"Error in prediction process for {symbol}: {str(e)}")
             return None
+
+    def get_sentiment_analysis(self, symbol):
+        """Get sentiment analysis for a stock."""
+        return self.sentiment_analyzer.analyze_market_sentiment(symbol)
+
+    def get_market_sentiment(self):
+        """Get overall market sentiment."""
+        major_symbols = ['^GSPC', '^DJI', 'AAPL', 'MSFT', 'GOOGL']
+        return self.sentiment_analyzer.get_market_mood(major_symbols)
 
     @staticmethod
     def get_market_indicators():
