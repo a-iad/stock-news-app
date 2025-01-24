@@ -1,8 +1,12 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
+from predictions import MarketPredictor
 
 class MarketData:
+    def __init__(self):
+        self.predictor = MarketPredictor()
+
     @staticmethod
     def get_stock_data(symbol, period='1mo'):
         """Fetch stock data from Yahoo Finance."""
@@ -12,6 +16,21 @@ class MarketData:
             return data
         except Exception as e:
             return pd.DataFrame()
+
+    def get_stock_prediction(self, symbol):
+        """Get prediction for a specific stock."""
+        try:
+            # Get 6 months of historical data for better prediction
+            data = self.get_stock_data(symbol, period='6mo')
+            if data.empty:
+                return None
+
+            # Train model if needed
+            if self.predictor.train(data):
+                return self.predictor.predict_trend(data)
+            return None
+        except Exception as e:
+            return None
 
     @staticmethod
     def get_market_indicators():

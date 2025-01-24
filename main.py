@@ -42,12 +42,26 @@ col1, col2 = st.columns([2, 1])
 with col1:
     st.subheader("Portfolio Overview")
     
-    # Portfolio table
     if not st.session_state.portfolio.holdings.empty:
         portfolio_value = st.session_state.portfolio.get_portfolio_value(market_data)
         st.dataframe(st.session_state.portfolio.holdings)
         st.metric("Total Portfolio Value", f"${portfolio_value:,.2f}")
-        
+
+        # Add ML Predictions section
+        st.subheader("ML Trend Predictions")
+        for _, position in st.session_state.portfolio.holdings.iterrows():
+            prediction = market_data.get_stock_prediction(position['Symbol'])
+            if prediction:
+                with st.expander(f"Prediction for {position['Symbol']}"):
+                    col_pred1, col_pred2 = st.columns(2)
+                    with col_pred1:
+                        st.metric("Predicted Trend", prediction['trend'])
+                        st.metric("Confidence Score", f"{prediction['confidence']:.2%}")
+                    with col_pred2:
+                        st.metric("Predicted Change", f"{prediction['predicted_change']:.2%}")
+                        st.metric("Target Price", f"${prediction['predicted_price']:.2f}")
+                    st.caption(f"Prediction for {prediction['prediction_date'].strftime('%Y-%m-%d')}")
+
         # Portfolio visualization
         fig = px.pie(st.session_state.portfolio.holdings, 
                     values='Current Value', 
