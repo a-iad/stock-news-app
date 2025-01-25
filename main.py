@@ -172,11 +172,24 @@ with col2:
                 with st.expander(f"Sentiment Analysis for {symbol}"):
                     col_sent1, col_sent2 = st.columns(2)
                     with col_sent1:
-                        st.metric("Sentiment Direction", sentiment['sentiment_direction'])
-                        st.metric("News Count", sentiment['news_count'])
+                        st.metric("Market Sentiment", sentiment['sentiment_direction'])
+                        st.metric("Confidence", f"{sentiment['confidence']:.1f}%")
                     with col_sent2:
-                        st.metric("Sentiment Score", f"{sentiment['average_sentiment']:.2f}")
-                        st.caption(f"Last updated: {sentiment['timestamp'].strftime('%Y-%m-%d %H:%M')}")
+                        st.metric("Market Impact", sentiment['market_impact'])
+                        st.metric("Analyzed News", sentiment['news_count'])
+
+                    if sentiment['key_insights']:
+                        st.subheader("Key Market Insights")
+                        for insight in sentiment['key_insights']:
+                            impact_color = "red" if insight['score'] < 0 else "green"
+                            st.markdown(f"""
+                            <div style='padding: 10px; border-left: 3px solid {impact_color};'>
+                                <p><strong>Impact Level:</strong> {insight['impact']}</p>
+                                <p>{insight['title']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    st.caption(f"Last updated: {sentiment['timestamp'].strftime('%Y-%m-%d %H:%M')}")
 
 
 # Alerts section
