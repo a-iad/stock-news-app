@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from market_data import MarketData
 from portfolio import Portfolio
 from alerts import AlertSystem
-from analysis import PortfolioAnalysis
 
 # Initialize session state
 if 'portfolio' not in st.session_state:
@@ -72,8 +71,13 @@ if not st.session_state.portfolio.holdings.empty:
         current_col = col1 if i % 2 == 0 else col2
 
         with current_col:
-            with st.expander(symbol, expanded=True):
-                # Get stock data
+            with st.container():
+                st.markdown(f"""
+                <div style='padding: 20px; border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px;'>
+                    <h2>{symbol}</h2>
+                """, unsafe_allow_html=True)
+
+                # Get stock data and display price info
                 stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
                 if not stock_data.empty:
                     current_price = stock_data['Close'].iloc[-1]
@@ -94,50 +98,64 @@ if not st.session_state.portfolio.holdings.empty:
                     sentiment = market_data.get_sentiment_analysis(symbol)
 
                     if news and sentiment:
-                        # Display key insights
+                        # Summary points with impacts
+                        st.write("**Key Market Updates:**")
+
+                        # Get top 3 most significant insights
                         if sentiment.get('key_insights'):
-                            st.write("**Key Market Insights:**")
-                            for insight in sentiment['key_insights']:
+                            for i, insight in enumerate(sentiment['key_insights'][:3], 1):
                                 impact_color = "red" if insight['score'] < 0 else "green"
                                 st.markdown(f"""
-                                <div style='padding: 10px; border-left: 3px solid {impact_color}; margin-bottom: 10px;'>
-                                    <p><strong>Impact:</strong> {insight['impact']}</p>
-                                    <p>{insight['title']}</p>
+                                <div style='margin-bottom: 15px;'>
+                                    <p style='margin-bottom: 5px;'><strong>{i}. {insight['title']}</strong></p>
+                                    <div style='padding: 10px; border-left: 3px solid {impact_color}; background-color: rgba(0,0,0,0.05);'>
+                                        <strong>Impact Analysis:</strong><br>
+                                        • Market Impact: {insight['impact']}<br>
+                                        • Sentiment Score: {insight['score']:.2f}
+                                    </div>
                                 </div>
                                 """, unsafe_allow_html=True)
 
-                        # Display detailed news analysis
+                        # Detailed news section
                         st.write("**Recent Articles:**")
                         for article in news[:4]:  # Display up to 4 articles
-                            with st.expander(f"📰 {article['title']}", expanded=False):
-                                col_news1, col_news2 = st.columns([2, 1])
+                            st.markdown("---")
 
-                                with col_news1:
-                                    st.write("**Summary:**")
-                                    st.write(article['description'])
+                            # Article header with title
+                            st.markdown(f"**{article['title']}**")
 
-                                    if article.get('relevance_explanation'):
-                                        st.write("**Why It's Relevant:**")
-                                        st.write(article['relevance_explanation'])
+                            # Two columns for article content and analysis
+                            col_content, col_analysis = st.columns([2, 1])
 
-                                with col_news2:
-                                    if article['analysis'].get('impact'):
-                                        sentiment_color = (
-                                            "green" if "positive" in article['analysis']['impact'].lower()
-                                            else "red" if "negative" in article['analysis']['impact'].lower()
-                                            else "gray"
-                                        )
-                                        st.markdown(f"""
-                                        <div style='padding: 5px; border: 1px solid {sentiment_color}; border-radius: 5px;'>
-                                            <p><strong>Sentiment Impact:</strong></p>
-                                            <p>{article['analysis']['impact']}</p>
-                                            <p>Confidence: {article['analysis']['confidence_score']}%</p>
-                                        </div>
-                                        """, unsafe_allow_html=True)
+                            with col_content:
+                                # Summary
+                                st.write(article['description'])
 
-                                st.caption(f"Published: {article.get('published_at', 'N/A')}")
+                                # Relevance explanation
+                                if article.get('relevance_explanation'):
+                                    st.markdown(f"*{article['relevance_explanation']}*")
+
+                            with col_analysis:
+                                # Sentiment analysis box
+                                if article['analysis'].get('impact'):
+                                    sentiment_color = (
+                                        "green" if "positive" in article['analysis']['impact'].lower()
+                                        else "red" if "negative" in article['analysis']['impact'].lower()
+                                        else "gray"
+                                    )
+                                    st.markdown(f"""
+                                    <div style='padding: 10px; border: 1px solid {sentiment_color}; border-radius: 5px;'>
+                                        <p><strong>Market Impact:</strong> {article['analysis']['impact']}</p>
+                                        <p><strong>Confidence:</strong> {article['analysis']['confidence_score']}%</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+
+                            # Publication date
+                            st.caption(f"Published: {article.get('published_at', 'N/A')}")
                     else:
                         st.info("No recent news available for this stock.")
+
+                st.markdown("</div>", unsafe_allow_html=True)
 else:
     st.info("Add positions to your portfolio to view stock analysis")
 
