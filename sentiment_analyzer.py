@@ -12,15 +12,29 @@ class SentimentAnalyzer:
 
         # Keywords that indicate market relevance
         self.market_keywords = [
-            'stock', 'market', 'investor', 'trading', 'earnings',
-            'revenue', 'profit', 'growth', 'decline', 'analyst',
-            'forecast', 'outlook', 'performance'
+            'stock price', 'market cap', 'trading volume', 'earnings report',
+            'quarterly results', 'revenue growth', 'profit margin', 'market share',
+            'analyst rating', 'price target', 'financial results', 'market performance'
         ]
 
-    def _is_relevant_news(self, title, description):
-        """Check if news is relevant to market sentiment."""
+    def _is_relevant_news(self, title, description, date_published):
+        """Check if news is relevant and recent."""
+        if not title or not description or not date_published:
+            return False
+
+        # Check if the article is recent (within last 7 days)
+        try:
+            pub_date = datetime.strptime(date_published, "%Y-%m-%dT%H:%M:%SZ")
+            if datetime.now() - pub_date > timedelta(days=7):
+                return False
+        except Exception as e:
+            print(f"Error parsing date: {str(e)}")
+            return False
+
+        # Check content relevance
         text = (title + ' ' + description).lower()
-        return any(keyword in text for keyword in self.market_keywords)
+        relevant_keywords = sum(1 for keyword in self.market_keywords if keyword.lower() in text)
+        return relevant_keywords >= 2  # Must contain at least 2 relevant keywords
 
     def analyze_market_sentiment(self, symbol):
         """Get sentiment analysis for a stock symbol."""
@@ -28,14 +42,16 @@ class SentimentAnalyzer:
             print(f"\nAnalyzing sentiment for {symbol}")
 
             # Prepare search query focusing on market-related news
-            query = f"({symbol} OR {symbol} stock) AND (market OR trading OR earnings OR investors)"
+            query = f"({symbol} stock) AND (market OR trading OR earnings)"
+            from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
             params = {
                 'q': query,
                 'apiKey': self.news_api_key,
                 'language': 'en',
-                'sortBy': 'relevancy',
-                'pageSize': 25  # Get more articles to filter
+                'sortBy': 'publishedAt',
+                'from': from_date,
+                'pageSize': 25
             }
 
             response = requests.get(self.news_api_url, params=params)
@@ -51,43 +67,50 @@ class SentimentAnalyzer:
             for article in articles:
                 title = article.get('title', '')
                 description = article.get('description', '')
+                published_at = article.get('publishedAt', '')
 
-                if not self._is_relevant_news(title or '', description or ''):
-                    continue
-
-                relevant_articles.append(article)
-                try:
-                    # Analyze title with higher weight
-                    if title:
+                if self._is_relevant_news(title, description, published_at):
+                    relevant_articles.append(article)
+                    try:
+                        # Analyze title with higher weight
                         title_blob = TextBlob(title)
                         title_score = title_blob.sentiment.polarity
-                        title_weight = 1.5 + abs(title_score) # Weight stronger sentiments more
+                        title_weight = 1.5 + abs(title_score)  # Weight stronger sentiments more
                         sentiments.append((title_score, title_weight))
 
                         # Store significant news (strong sentiment)
                         if abs(title_score) > 0.3:
+                            pub_date = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
                             significant_news.append({
                                 'title': title,
                                 'score': title_score,
-                                'impact': 'High' if abs(title_score) > 0.6 else 'Medium'
+                                'impact': 'High' if abs(title_score) > 0.6 else 'Medium',
+                                'published_at': pub_date.strftime("%Y-%m-%d %H:%M")
                             })
 
-                    # Analyze description
-                    if description:
-                        desc_blob = TextBlob(description)
-                        desc_score = desc_blob.sentiment.polarity
-                        sentiments.append((desc_score, 1.0))
+                        # Analyze description
+                        if description:
+                            desc_blob = TextBlob(description)
+                            desc_score = desc_blob.sentiment.polarity
+                            sentiments.append((desc_score, 1.0))
 
-                except Exception as e:
-                    print(f"Error analyzing article: {str(e)}")
-                    continue
+                    except Exception as e:
+                        print(f"Error analyzing article: {str(e)}")
+                        continue
 
             if not sentiments:
+                print(f"No relevant articles found for {symbol}")
                 return self._get_neutral_sentiment(symbol)
 
             # Calculate weighted average sentiment
             total_weight = sum(weight for _, weight in sentiments)
             weighted_sentiment = sum(score * weight for score, weight in sentiments) / total_weight
+
+            # Sort significant news by date and score
+            significant_news.sort(key=lambda x: (
+                datetime.strptime(x['published_at'], "%Y-%m-%d %H:%M"),
+                abs(x['score'])
+            ), reverse=True)
 
             # Determine trend and confidence
             sentiment_trend = self._get_sentiment_trend(weighted_sentiment)
@@ -97,9 +120,9 @@ class SentimentAnalyzer:
                 'symbol': symbol,
                 'average_sentiment': weighted_sentiment,
                 'sentiment_direction': sentiment_trend['direction'],
-                'confidence': confidence_score * 100,  # Convert to percentage
+                'confidence': confidence_score * 100,
                 'news_count': len(relevant_articles),
-                'key_insights': significant_news[:3],  # Top 3 significant news
+                'key_insights': significant_news[:3],
                 'market_impact': sentiment_trend['impact'],
                 'timestamp': datetime.now()
             }
@@ -113,8 +136,6 @@ class SentimentAnalyzer:
 
     def _get_sentiment_trend(self, sentiment_score):
         """Get detailed sentiment trend analysis."""
-        abs_score = abs(sentiment_score)
-
         if sentiment_score >= 0.5:
             return {'direction': 'Strong Bullish', 'impact': 'High Positive'}
         elif sentiment_score >= 0.2:
@@ -156,11 +177,10 @@ class SentimentAnalyzer:
             if not all_sentiments:
                 return None
 
-            # Calculate weighted market sentiment based on confidence and news count
             weighted_sentiment = sum(
                 s['average_sentiment'] * (s['confidence'] / 100) * s['news_count']
                 for s in all_sentiments
-            ) / (total_confidence * len(all_sentiments) if total_confidence * len(all_sentiments) >0 else 1) #Handle division by zero
+            ) / (total_confidence * len(all_sentiments) if total_confidence * len(all_sentiments) > 0 else 1)
 
             return {
                 'market_sentiment': weighted_sentiment,
