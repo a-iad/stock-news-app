@@ -2,14 +2,35 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 from predictions import MarketPredictor
-from sentiment_analyzer import SentimentAnalyzer
 from news_analyzer import NewsAnalyzer
 
 class MarketData:
     def __init__(self):
         self.predictor = MarketPredictor()
-        self.sentiment_analyzer = SentimentAnalyzer()
         self.news_analyzer = NewsAnalyzer()
+        print("MarketData initialized")
+
+    def get_news_analysis(self, symbol):
+        """Get news analysis for a stock."""
+        try:
+            print(f"\nFetching news analysis for {symbol}")
+            ticker = yf.Ticker(symbol)
+            company_name = ticker.info.get('longName', '')
+
+            news_data = self.news_analyzer.fetch_relevant_news(symbol, company_name)
+            if news_data:
+                print(f"Successfully fetched news for {symbol}")
+                if news_data.get('articles'):
+                    print(f"Found {len(news_data['articles'])} articles")
+                if news_data.get('summary_analysis'):
+                    print("Generated summary analysis")
+                return news_data
+            else:
+                print(f"No news data returned for {symbol}")
+            return None
+        except Exception as e:
+            print(f"Error in get_news_analysis for {symbol}: {str(e)}")
+            return None
 
     @staticmethod
     def get_stock_data(symbol, period='1mo'):
@@ -46,20 +67,6 @@ class MarketData:
             return None
         except Exception as e:
             print(f"Error in prediction process for {symbol}: {str(e)}")
-            return None
-
-    def get_sentiment_analysis(self, symbol):
-        """Get sentiment analysis for a stock."""
-        try:
-            print(f"Fetching sentiment analysis for {symbol}")
-            sentiment = self.sentiment_analyzer.analyze_market_sentiment(symbol)
-            if sentiment:
-                print(f"Sentiment analysis successful for {symbol}: {sentiment['sentiment_direction']}")
-            else:
-                print(f"No sentiment data available for {symbol}")
-            return sentiment
-        except Exception as e:
-            print(f"Error in sentiment analysis for {symbol}: {str(e)}")
             return None
 
     def get_market_sentiment(self):
@@ -121,22 +128,6 @@ class MarketData:
             }
         ]
         return pd.DataFrame(events)
-
-    def get_news_analysis(self, symbol):
-        """Get news analysis for a stock."""
-        try:
-            print(f"Fetching news analysis for {symbol}")
-            ticker = yf.Ticker(symbol)
-            company_name = ticker.info.get('longName')
-            news = self.news_analyzer.fetch_relevant_news(symbol, company_name)
-            if news:
-                print(f"Found {len(news)} relevant news items for {symbol}")
-            else:
-                print(f"No news found for {symbol}")
-            return news
-        except Exception as e:
-            print(f"Error fetching news analysis for {symbol}: {str(e)}")
-            return None
 
     def get_economic_news(self):
         """Get overall economic news impact."""
