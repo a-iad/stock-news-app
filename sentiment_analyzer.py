@@ -18,12 +18,10 @@ class SentimentAnalyzer:
             'analyst rating', 'price target', 'financial results', 'market performance'
         ]
 
-    def analyze_social_sentiment(self, symbol: str) -> Dict[str, Any]:
-        """Analyze sentiment from news and market data for a stock symbol."""
+    def analyze_news_sentiment(self, symbol: str) -> Dict[str, Any]:
+        """Analyze sentiment from news for a stock symbol."""
         try:
-            print(f"\nAnalyzing market sentiment for {symbol}")
-
-            # Get recent news articles and social discussions
+            print(f"\nAnalyzing news sentiment for {symbol}")
             articles = self._fetch_market_news(symbol)
 
             if not articles:
@@ -31,7 +29,7 @@ class SentimentAnalyzer:
                 return self._get_neutral_sentiment(symbol)
 
             sentiments = []
-            significant_posts = []
+            significant_news = []
 
             for article in articles:
                 try:
@@ -49,10 +47,10 @@ class SentimentAnalyzer:
                     sentiments.append((sentiment_score, weight))
 
                     if abs(sentiment_score) > 0.3:
-                        significant_posts.append({
-                            'text': article.get('title', ''),
+                        significant_news.append({
+                            'title': article.get('title', ''),
                             'sentiment': sentiment_score,
-                            'timestamp': article.get('publishedAt', datetime.now().isoformat()),
+                            'published_at': article.get('publishedAt', datetime.now().isoformat()),
                             'impact': 'High' if abs(sentiment_score) > 0.6 else 'Medium'
                         })
                 except Exception as e:
@@ -73,8 +71,8 @@ class SentimentAnalyzer:
                 'average_sentiment': weighted_sentiment,
                 'sentiment_direction': sentiment_trend['direction'],
                 'confidence': confidence_score * 100,
-                'total_posts': len(sentiments),
-                'key_posts': significant_posts[:5],
+                'total_articles': len(sentiments),
+                'key_articles': significant_news[:5],
                 'market_impact': sentiment_trend['impact'],
                 'timestamp': datetime.now()
             }
@@ -86,15 +84,15 @@ class SentimentAnalyzer:
     def _get_sentiment_trend(self, sentiment_score):
         """Get detailed sentiment trend analysis."""
         if sentiment_score >= 0.5:
-            return {'direction': 'Strong Bullish', 'impact': 'High Positive'}
+            return {'direction': 'Strong Bullish', 'impact': 'Very Positive'}
         elif sentiment_score >= 0.2:
-            return {'direction': 'Bullish', 'impact': 'Positive'}
+            return {'direction': 'Bullish', 'impact': 'Somewhat Positive'}
         elif sentiment_score <= -0.5:
-            return {'direction': 'Strong Bearish', 'impact': 'High Negative'}
+            return {'direction': 'Strong Bearish', 'impact': 'Very Negative'}
         elif sentiment_score <= -0.2:
-            return {'direction': 'Bearish', 'impact': 'Negative'}
+            return {'direction': 'Bearish', 'impact': 'Somewhat Negative'}
         else:
-            return {'direction': 'Neutral', 'impact': 'Low'}
+            return {'direction': 'Neutral', 'impact': 'Ambivalent'}
 
     def _get_neutral_sentiment(self, symbol):
         """Return neutral sentiment for cases with no data."""
@@ -103,9 +101,9 @@ class SentimentAnalyzer:
             'average_sentiment': 0,
             'sentiment_direction': 'Neutral',
             'confidence': 0,
-            'total_posts': 0,
-            'key_posts': [],
-            'market_impact': 'No Impact',
+            'total_articles': 0,
+            'key_articles': [],
+            'market_impact': 'Ambivalent',
             'timestamp': datetime.now()
         }
 
@@ -139,37 +137,3 @@ class SentimentAnalyzer:
         except Exception as e:
             print(f"Error fetching market news: {str(e)}")
             return []
-
-    def get_market_mood(self, symbols):
-        """Get overall market sentiment."""
-        try:
-            all_sentiments = []
-            total_confidence = 0
-            total_posts = 0
-
-            for symbol in symbols:
-                sentiment = self.analyze_social_sentiment(symbol)
-                if sentiment and sentiment['total_posts'] > 0:
-                    all_sentiments.append(sentiment)
-                    total_confidence += sentiment['confidence']
-                    total_posts += sentiment['total_posts']
-
-            if not all_sentiments:
-                return None
-
-            weighted_sentiment = sum(
-                s['average_sentiment'] * (s['confidence'] / 100) * s['total_posts']
-                for s in all_sentiments
-            ) / (total_confidence * len(all_sentiments) if total_confidence * len(all_sentiments) > 0 else 1)
-
-            return {
-                'market_sentiment': weighted_sentiment,
-                'analyzed_symbols': len(all_sentiments),
-                'total_posts': total_posts,
-                'average_confidence': total_confidence / len(all_sentiments) if all_sentiments else 0,
-                'timestamp': datetime.now()
-            }
-
-        except Exception as e:
-            print(f"Error in market mood analysis: {str(e)}")
-            return None

@@ -76,9 +76,9 @@ class MarketData:
         try:
             print("Fetching overall market sentiment")
             major_symbols = ['^GSPC', '^DJI', 'AAPL', 'MSFT', 'GOOGL']
-            sentiment = self.sentiment_analyzer.get_market_mood(major_symbols)
+            sentiment = self.sentiment_analyzer.analyze_news_sentiment(major_symbols)
             if sentiment:
-                print(f"Market sentiment analysis successful: {sentiment['market_sentiment']:.2f}")
+                print(f"Market sentiment analysis successful: {sentiment['average_sentiment']:.2f}")
             else:
                 print("No market sentiment data available")
             return sentiment

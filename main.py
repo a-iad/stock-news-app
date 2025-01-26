@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from market_data import MarketData
 from portfolio import Portfolio
 from alerts import AlertSystem
-from sentiment_analyzer import SentimentAnalyzer
 
 # Initialize session state
 if 'portfolio' not in st.session_state:
@@ -19,7 +18,6 @@ if 'show_add_position' not in st.session_state:
 
 # Initialize components
 market_data = MarketData()
-sentiment_analyzer = SentimentAnalyzer()
 
 # Page configuration
 st.set_page_config(page_title="Market Intelligence Dashboard", layout="wide")
@@ -97,51 +95,12 @@ if not st.session_state.portfolio.holdings.empty:
                     f"{price_change:+.2f}% ({selected_period})"
                 )
 
-        # News and Social Sentiment section
-        st.subheader("Recent News & Social Sentiment")
-
-        # Get both news and social sentiment
+        # News section
+        st.subheader("Recent Market News")
         news_data = market_data.get_news_analysis(symbol)
-        social_sentiment = sentiment_analyzer.analyze_social_sentiment(symbol)
-
-        # Display social sentiment first
-        if social_sentiment and social_sentiment['total_posts'] > 0:
-            st.markdown("### Social Media Sentiment")
-
-            # Create columns for metrics
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                sentiment_color = '#00ff00' if social_sentiment['average_sentiment'] > 0 else '#ff0000'
-                st.metric(
-                    "Sentiment Score",
-                    f"{social_sentiment['average_sentiment']:.2f}",
-                    delta=social_sentiment['sentiment_direction']
-                )
-
-            with col2:
-                st.metric("Confidence", f"{social_sentiment['confidence']:.1f}%")
-
-            with col3:
-                st.metric("Posts Analyzed", social_sentiment['total_posts'])
-
-            # Display key posts
-            if social_sentiment['key_posts']:
-                st.markdown("#### Notable Social Media Posts")
-                for post in social_sentiment['key_posts']:
-                    with st.container():
-                        st.markdown(f"""
-                        <div style='padding: 10px; border-left: 3px solid {sentiment_color}; margin: 10px 0;'>
-                            <p style='margin: 0;'>{post['text']}</p>
-                            <p style='color: gray; font-size: 0.8em; margin: 5px 0;'>
-                                Impact: {post['impact']} | Posted: {post['timestamp']}
-                            </p>
-                        </div>
-                        """, unsafe_allow_html=True)
 
         # Display news articles
         if news_data and news_data.get('articles'):
-            st.markdown("### Market News")
             for article in news_data['articles']:
                 with st.container():
                     st.markdown("---")

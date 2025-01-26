@@ -26,18 +26,22 @@ class NewsAnalyzer:
                 print("ERROR: No DeepSeek API key found")
                 return None
 
+            headers = {
+                "Authorization": f"Bearer {self.deepseek_api_key}",
+                "Content-Type": "application/json"
+            }
+
+            # Use HTTPS and verify the connection
             response = requests.post(
-                self.deepseek_url,
-                headers={
-                    "Authorization": f"Bearer {self.deepseek_api_key}",
-                    "Content-Type": "application/json"
-                },
+                "https://api.deepseek.com/v1/completions",  # Updated endpoint
+                headers=headers,
                 json={
                     "model": "deepseek-chat",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.7
                 },
-                timeout=30
+                timeout=30,
+                verify=True
             )
 
             print(f"DeepSeek response status: {response.status_code}")
@@ -45,13 +49,18 @@ class NewsAnalyzer:
                 result = response.json()
                 print("Got DeepSeek response")
                 return result['choices'][0]['message']['content']
+            elif response.status_code == 401:
+                print("DeepSeek API authentication failed - invalid API key")
+                return None
+            else:
+                print(f"DeepSeek API error: {response.text}")
+                return None
 
-            print(f"DeepSeek API error: {response.text}")
+        except requests.exceptions.RequestException as e:
+            print(f"DeepSeek API connection error: {str(e)}")
             return None
-
         except Exception as e:
             print(f"DeepSeek API error: {str(e)}")
-            traceback.print_exc()
             return None
 
     def _analyze_article(self, article: Dict[str, Any], symbol: str, company_name: str) -> Dict[str, Any]:
