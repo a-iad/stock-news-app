@@ -13,42 +13,49 @@ if 'alerts' not in st.session_state:
     st.session_state.alerts = AlertSystem()
 if 'selected_period' not in st.session_state:
     st.session_state.selected_period = 'day'
+if 'show_add_position' not in st.session_state:
+    st.session_state.show_add_position = False
 
 # Initialize components
 market_data = MarketData()
 
 # Page configuration
 st.set_page_config(page_title="Market Intelligence Dashboard", layout="wide")
-st.title("Market Intelligence Dashboard")
 
-# Sidebar for portfolio management
-with st.sidebar:
-    st.header("Portfolio Management")
+# Navigation bar
+with st.container():
+    col1, col2, col3 = st.columns([2, 8, 2])
+    with col1:
+        st.title("Market Intel")
+    with col3:
+        if st.button("➕ Add Position", type="primary"):
+            st.session_state.show_add_position = True
 
-    # Add position form
-    with st.form("add_position"):
-        symbol = st.text_input("Stock Symbol").upper()
-        shares = st.number_input("Number of Shares", min_value=0.0)
-        price = st.number_input("Entry Price", min_value=0.0)
+# Modal for adding position
+if st.session_state.show_add_position:
+    with st.container():
+        st.markdown("### Add New Position")
+        with st.form("add_position_modal"):
+            symbol = st.text_input("Stock Symbol").upper()
+            shares = st.number_input("Number of Shares", min_value=0.0)
+            price = st.number_input("Entry Price", min_value=0.0)
 
-        if st.form_submit_button("Add Position"):
-            st.session_state.portfolio.add_position(symbol, shares, price)
-            st.success(f"Added {shares} shares of {symbol}")
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                submit = st.form_submit_button("Add Position")
+            with col2:
+                if st.form_submit_button("Cancel"):
+                    st.session_state.show_add_position = False
+                    st.rerun()
 
-    # Portfolio positions with remove buttons
-    st.subheader("Current Positions")
-    for idx, position in st.session_state.portfolio.holdings.iterrows():
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.write(f"{position['Symbol']}: {position['Shares']} shares")
-        with col2:
-            if st.button("Remove", key=f"remove_{position['Symbol']}"):
-                st.session_state.portfolio.remove_position(position['Symbol'])
+            if submit and symbol and shares and price:
+                st.session_state.portfolio.add_position(symbol, shares, price)
+                st.session_state.show_add_position = False
+                st.success(f"Added {shares} shares of {symbol}")
                 st.rerun()
 
-# Main dashboard - Stock Cards
+# Period selector for all stocks
 if not st.session_state.portfolio.holdings.empty:
-    # Period selector
     period_options = {
         'day': '1d',
         'week': '5d',
@@ -62,136 +69,93 @@ if not st.session_state.portfolio.holdings.empty:
     )
     st.session_state.selected_period = selected_period
 
-    # Create two columns for stock cards
+    # Display stocks and their news vertically
     stocks = st.session_state.portfolio.holdings['Symbol'].tolist()
-    col1, col2 = st.columns(2)
 
-    # Distribute stocks between columns
-    for i, symbol in enumerate(stocks):
-        current_col = col1 if i % 2 == 0 else col2
+    for symbol in stocks:
+        st.markdown("---")
 
-        with current_col:
-            with st.container():
-                st.markdown(f"""
-                <div style='padding: 20px; border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px;'>
-                    <h2>{symbol}</h2>
-                """, unsafe_allow_html=True)
+        # Stock header with price info
+        with st.container():
+            col1, col2 = st.columns([6, 2])
+            with col1:
+                st.markdown(f"## {symbol}")
+            with col2:
+                if st.button("Remove", key=f"remove_{symbol}"):
+                    st.session_state.portfolio.remove_position(symbol)
+                    st.rerun()
 
-                # Price and movement
-                stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
-                if not stock_data.empty:
-                    current_price = stock_data['Close'].iloc[-1]
-                    price_change = ((current_price - stock_data['Close'].iloc[0]) / stock_data['Close'].iloc[0]) * 100
+            stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
+            if not stock_data.empty:
+                current_price = stock_data['Close'].iloc[-1]
+                price_change = ((current_price - stock_data['Close'].iloc[0]) / stock_data['Close'].iloc[0]) * 100
+                st.metric(
+                    "Current Price",
+                    f"${current_price:.2f}",
+                    f"{price_change:+.2f}% ({selected_period})"
+                )
 
-                    st.metric(
-                        "Current Price",
-                        f"${current_price:.2f}",
-                        f"{price_change:+.2f}% ({selected_period})"
-                    )
+        # News section
+        st.subheader("Recent News & Analysis")
+        news_data = market_data.get_news_analysis(symbol)
 
-                    # News and Sentiment Analysis
-                    st.subheader("Recent News")
+        if news_data and news_data.get('articles'):
+            for article in news_data['articles']:
+                with st.container():
+                    st.markdown("---")
 
-                    # Get news analysis
-                    news_data = market_data.get_news_analysis(symbol)
+                    # Article title
+                    st.markdown(f"### {article['title']}")
 
-                    if news_data and news_data.get('articles'):
-                        # Display key summary points with impacts
-                        if news_data.get('summary_analysis'):
-                            st.write("**Key Market Updates:**")
-                            for point in news_data['summary_analysis'].get('key_points', []):
-                                with st.container():
-                                    st.markdown(f"""
-                                    <div style='margin-bottom: 15px;'>
-                                        <p style='margin-bottom: 5px;'><strong>{point['point']}</strong></p>
-                                        <div style='padding: 10px; background-color: rgba(0,0,0,0.05);'>
-                                            <strong>Impact Analysis:</strong><br>
-                                            {point['impact']}
-                                        </div>
-                                    </div>
-                                    """, unsafe_allow_html=True)
+                    # Summary and Analysis
+                    if article.get('article_summary'):
+                        st.markdown(f"""
+                        <div style='margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;'>
+                            <strong>Summary:</strong><br>
+                            {article['article_summary']}
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                        # Display recent articles
-                        st.write("**Recent Articles:**")
-                        for article in news_data['articles']:
-                            st.markdown("---")
+                    # Market Impact
+                    analysis = article.get('analysis', {})
+                    impact = analysis.get('market_impact', 'Ambivalent')
 
-                            # Article header with title
-                            st.markdown(f"**{article['title']}**")
+                    impact_colors = {
+                        'Very Positive': '#1b5e20',
+                        'Somewhat Positive': '#2e7d32',
+                        'Ambivalent': '#666666',
+                        'Somewhat Negative': '#c62828',
+                        'Very Negative': '#b71c1c'
+                    }
+                    impact_color = impact_colors.get(impact, '#666666')
 
-                            # Article content and analysis
-                            col_content, col_analysis = st.columns([2, 1])
+                    col1, col2 = st.columns([4, 1])
 
-                            with col_content:
-                                # Article Summary
-                                if article.get('article_summary'):
-                                    st.markdown("""
-                                    <div style='margin-bottom: 15px;'>
-                                        <strong>Summary:</strong><br>
-                                        {}
-                                    </div>
-                                    """.format(article['article_summary']), unsafe_allow_html=True)
+                    with col1:
+                        # Enhanced Why It Matters section
+                        if analysis.get('significance'):
+                            st.markdown(f"""
+                            <div style='margin-top: 20px; padding: 20px; background-color: #f0f2f6; border-radius: 5px;'>
+                                <h4 style='margin-bottom: 10px; color: #1a237e;'>Why It Matters</h4>
+                                <p style='font-size: 16px; line-height: 1.6;'>{analysis['significance']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
 
-                                # Why it matters section
-                                if article.get('analysis', {}).get('significance'):
-                                    st.markdown("""
-                                    <div style='margin-top: 10px; padding: 10px; background-color: #f0f2f6; border-radius: 5px;'>
-                                        <strong>Why It Matters:</strong><br>
-                                        {}
-                                    </div>
-                                    """.format(article['analysis']['significance']), unsafe_allow_html=True)
+                    with col2:
+                        st.markdown(f"""
+                        <div style='padding: 15px; border: 2px solid {impact_color}; border-radius: 5px; margin-top: 20px;'>
+                            <p style='color: {impact_color}; font-weight: bold; margin-bottom: 10px;'>Market Impact</p>
+                            <p style='font-size: 16px; font-weight: bold;'>{impact}</p>
+                            <p style='font-style: italic; font-size: 14px;'>{analysis.get('impact_explanation', '')}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                            with col_analysis:
-                                # Impact analysis
-                                analysis = article.get('analysis', {})
-                                impact = analysis.get('market_impact', 'Ambivalent')
+                    st.caption(f"Published: {article.get('published_at', 'N/A')}")
+        else:
+            st.info("No recent news available for this stock.")
 
-                                # Define color scheme for different impact levels
-                                impact_colors = {
-                                    'Very Positive': '#1b5e20',  # Dark green
-                                    'Somewhat Positive': '#2e7d32',  # Medium green
-                                    'Ambivalent': '#666666',  # Gray
-                                    'Somewhat Negative': '#c62828',  # Medium red
-                                    'Very Negative': '#b71c1c'  # Dark red
-                                }
-
-                                impact_color = impact_colors.get(impact, '#666666')
-
-                                st.markdown(f"""
-                                <div style='padding: 10px; border: 1px solid {impact_color}; border-radius: 5px;'>
-                                    <p style='color: {impact_color};'><strong>Market Impact:</strong> {impact}</p>
-                                    <p><em>{analysis.get('impact_explanation', '')}</em></p>
-                                </div>
-                                """, unsafe_allow_html=True)
-
-                            st.caption(f"Published: {article.get('published_at', 'N/A')}")
-
-                    else:
-                        st.info("No recent news available for this stock.")
-
-                st.markdown("</div>", unsafe_allow_html=True)
 else:
     st.info("Add positions to your portfolio to view stock analysis")
-
-# Alerts section
-st.header("Market Alerts")
-col3, col4 = st.columns([1, 2])
-
-with col3:
-    st.subheader("Recent Alerts")
-    # Check for new alerts
-    st.session_state.alerts.check_price_alerts(st.session_state.portfolio, market_data)
-    st.session_state.alerts.check_market_alerts(market_data)
-
-    # Display alerts
-    for alert in st.session_state.alerts.get_alerts():
-        with st.container():
-            st.warning(f"**{alert['symbol']}**: {alert['message']}")
-
-with col4:
-    st.subheader("Economic Calendar")
-    calendar = market_data.get_economic_calendar()
-    st.dataframe(calendar)
 
 # Footer
 st.markdown("---")
