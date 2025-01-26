@@ -74,54 +74,50 @@ if not st.session_state.portfolio.holdings.empty:
 
     for symbol in stocks:
         st.markdown("---")
+        st.markdown(f"## {symbol}")
 
-        # Stock header with price info
-        with st.container():
-            col1, col2 = st.columns([6, 2])
-            with col1:
-                st.markdown(f"## {symbol}")
-            with col2:
-                if st.button("Remove", key=f"remove_{symbol}"):
-                    st.session_state.portfolio.remove_position(symbol)
-                    st.rerun()
+        # Stock data
+        stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
+        if not stock_data.empty:
+            current_price = stock_data['Close'].iloc[-1]
+            price_change = ((current_price - stock_data['Close'].iloc[0]) / stock_data['Close'].iloc[0]) * 100
+            st.metric(
+                "Current Price",
+                f"${current_price:.2f}",
+                f"{price_change:+.2f}% ({selected_period})"
+            )
 
-            stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
-            if not stock_data.empty:
-                current_price = stock_data['Close'].iloc[-1]
-                price_change = ((current_price - stock_data['Close'].iloc[0]) / stock_data['Close'].iloc[0]) * 100
-                st.metric(
-                    "Current Price",
-                    f"${current_price:.2f}",
-                    f"{price_change:+.2f}% ({selected_period})"
-                )
+        # Remove button
+        if st.button("Remove", key=f"remove_{symbol}"):
+            st.session_state.portfolio.remove_position(symbol)
+            st.rerun()
 
         # News section
         st.subheader("Recent Market News")
         news_data = market_data.get_news_analysis(symbol)
 
-        # Create scrollable container for news
-        scroll_container = st.empty()
-        with scroll_container.container():
-            if news_data and news_data.get('articles'):
-                for article in news_data['articles']:
-                    st.markdown("---")
+        if news_data and news_data.get('articles'):
+            for article in news_data['articles']:
+                st.markdown("---")
 
-                    # Article title
-                    st.subheader(article['title'])
+                # Title
+                st.markdown(f"### {article['title']}")
 
-                    # Analysis content
-                    analysis = article.get('analysis', {})
-                    if analysis.get('significance'):
-                        st.markdown(analysis['significance'])
+                # Analysis
+                analysis = article.get('analysis', {})
+                if analysis and analysis.get('significance'):
+                    st.text("Analysis:")
+                    st.write(analysis['significance'])
 
-                    # Market Impact
-                    impact = analysis.get('market_impact', 'Ambivalent')
-                    st.markdown(f"**Market Impact:** {impact}")
+                # Market Impact
+                impact = analysis.get('market_impact', 'Ambivalent')
+                st.text(f"Market Impact: {impact}")
 
-                    # Publication date
-                    st.caption(f"Published: {article.get('published_at', 'N/A')}")
-            else:
-                st.info("No recent news available for this stock.")
+                # Date
+                st.text(f"Published: {article.get('published_at', 'N/A')}")
+                st.markdown(" ")  # Add space between articles
+        else:
+            st.info("No recent news available for this stock.")
 
 else:
     st.info("Add positions to your portfolio to view stock analysis")
