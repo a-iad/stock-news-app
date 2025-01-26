@@ -12,16 +12,31 @@ class SentimentAnalyzer:
         self.news_api_key = os.environ.get('NEWS_API_KEY')
         self.news_api_url = "https://newsapi.org/v2/everything"
 
-        # Initialize Twitter API
-        auth = tweepy.OAuthHandler(
-            os.environ.get('TWITTER_API_KEY'),
-            os.environ.get('TWITTER_API_SECRET')
-        )
-        auth.set_access_token(
-            os.environ.get('TWITTER_ACCESS_TOKEN'),
-            os.environ.get('TWITTER_ACCESS_SECRET')
-        )
-        self.twitter_api = tweepy.API(auth)
+        # Initialize Twitter API only if credentials are available
+        self.twitter_api = None
+        twitter_creds = {
+            'api_key': os.environ.get('TWITTER_API_KEY'),
+            'api_secret': os.environ.get('TWITTER_API_SECRET'),
+            'access_token': os.environ.get('TWITTER_ACCESS_TOKEN'),
+            'access_secret': os.environ.get('TWITTER_ACCESS_SECRET')
+        }
+
+        if all(twitter_creds.values()):
+            try:
+                auth = tweepy.OAuthHandler(
+                    twitter_creds['api_key'],
+                    twitter_creds['api_secret']
+                )
+                auth.set_access_token(
+                    twitter_creds['access_token'],
+                    twitter_creds['access_secret']
+                )
+                self.twitter_api = tweepy.API(auth)
+                print("Twitter API initialized successfully")
+            except Exception as e:
+                print(f"Failed to initialize Twitter API: {str(e)}")
+        else:
+            print("Twitter credentials not found, social sentiment analysis will be disabled")
 
         # Keywords that indicate market relevance
         self.market_keywords = [
@@ -32,15 +47,17 @@ class SentimentAnalyzer:
 
     def analyze_social_sentiment(self, symbol: str, max_tweets: int = 100) -> Dict[str, Any]:
         """Analyze sentiment from social media for a stock symbol."""
+        if not self.twitter_api:
+            print("Twitter API not configured, returning neutral sentiment")
+            return self._get_neutral_sentiment(symbol)
+
         try:
             print(f"\nAnalyzing social sentiment for {symbol}")
 
-            # Search query for relevant tweets
             query = f"${symbol} OR #{symbol}stock -filter:retweets"
             tweets = []
 
             try:
-                # Get tweets using Tweepy
                 tweets = self.twitter_api.search_tweets(
                     q=query,
                     lang="en",
@@ -55,18 +72,15 @@ class SentimentAnalyzer:
                 print(f"No tweets found for {symbol}")
                 return self._get_neutral_sentiment(symbol)
 
-            # Analyze sentiment of each tweet
             sentiments = []
             significant_posts = []
 
             for tweet in tweets:
                 try:
-                    # Use TextBlob for sentiment analysis
                     text = tweet.full_text
                     blob = TextBlob(text)
                     sentiment_score = blob.sentiment.polarity
 
-                    # Weight more for tweets with market-relevant keywords
                     weight = 1.0
                     text_lower = text.lower()
                     relevant_keywords = sum(1 for keyword in self.market_keywords if keyword in text_lower)
@@ -75,7 +89,6 @@ class SentimentAnalyzer:
 
                     sentiments.append((sentiment_score, weight))
 
-                    # Store significant posts (strong sentiment)
                     if abs(sentiment_score) > 0.3:
                         significant_posts.append({
                             'text': text,
@@ -90,17 +103,14 @@ class SentimentAnalyzer:
             if not sentiments:
                 return self._get_neutral_sentiment(symbol)
 
-            # Calculate weighted average sentiment
             total_weight = sum(weight for _, weight in sentiments)
             weighted_sentiment = sum(score * weight for score, weight in sentiments) / total_weight
 
-            # Sort significant posts by absolute sentiment and recency
             significant_posts.sort(
                 key=lambda x: (abs(x['sentiment']), x['timestamp']),
                 reverse=True
             )
 
-            # Determine sentiment trend and confidence
             sentiment_trend = self._get_sentiment_trend(weighted_sentiment)
             confidence_score = min(len(sentiments) / max_tweets, 1.0) * (1 + abs(weighted_sentiment))
 
@@ -110,7 +120,7 @@ class SentimentAnalyzer:
                 'sentiment_direction': sentiment_trend['direction'],
                 'confidence': confidence_score * 100,
                 'total_posts': len(sentiments),
-                'key_posts': significant_posts[:5],  # Top 5 most significant posts
+                'key_posts': significant_posts[:5],
                 'market_impact': sentiment_trend['impact'],
                 'timestamp': datetime.now()
             }
@@ -156,7 +166,6 @@ class SentimentAnalyzer:
             total_posts = 0
 
             for symbol in symbols:
-                # Get social media sentiment
                 social_sentiment = self.analyze_social_sentiment(symbol)
                 if social_sentiment and social_sentiment['total_posts'] > 0:
                     all_sentiments.append(social_sentiment)
@@ -166,7 +175,6 @@ class SentimentAnalyzer:
             if not all_sentiments:
                 return None
 
-            # Calculate weighted average sentiment
             weighted_sentiment = sum(
                 s['average_sentiment'] * (s['confidence'] / 100) * s['total_posts']
                 for s in all_sentiments
@@ -189,7 +197,6 @@ class SentimentAnalyzer:
         if not title or not description or not date_published:
             return False
 
-        # Check if the article is recent (within last 7 days)
         try:
             pub_date = datetime.strptime(date_published, "%Y-%m-%dT%H:%M:%SZ")
             if datetime.now() - pub_date > timedelta(days=7):
@@ -198,17 +205,15 @@ class SentimentAnalyzer:
             print(f"Error parsing date: {str(e)}")
             return False
 
-        # Check content relevance
         text = (title + ' ' + description).lower()
         relevant_keywords = sum(1 for keyword in self.market_keywords if keyword.lower() in text)
-        return relevant_keywords >= 2  # Must contain at least 2 relevant keywords
+        return relevant_keywords >= 2
 
     def analyze_market_sentiment(self, symbol):
         """Get sentiment analysis for a stock symbol."""
         try:
             print(f"\nAnalyzing sentiment for {symbol}")
 
-            # Prepare search query focusing on market-related news
             query = f"({symbol} stock) AND (market OR trading OR earnings)"
             from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
@@ -239,13 +244,11 @@ class SentimentAnalyzer:
                 if self._is_relevant_news(title, description, published_at):
                     relevant_articles.append(article)
                     try:
-                        # Analyze title with higher weight
                         title_blob = TextBlob(title)
                         title_score = title_blob.sentiment.polarity
-                        title_weight = 1.5 + abs(title_score)  # Weight stronger sentiments more
+                        title_weight = 1.5 + abs(title_score)
                         sentiments.append((title_score, title_weight))
 
-                        # Store significant news (strong sentiment)
                         if abs(title_score) > 0.3:
                             pub_date = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
                             significant_news.append({
@@ -255,7 +258,6 @@ class SentimentAnalyzer:
                                 'published_at': pub_date.strftime("%Y-%m-%d %H:%M")
                             })
 
-                        # Analyze description
                         if description:
                             desc_blob = TextBlob(description)
                             desc_score = desc_blob.sentiment.polarity
@@ -269,17 +271,14 @@ class SentimentAnalyzer:
                 print(f"No relevant articles found for {symbol}")
                 return self._get_neutral_sentiment(symbol)
 
-            # Calculate weighted average sentiment
             total_weight = sum(weight for _, weight in sentiments)
             weighted_sentiment = sum(score * weight for score, weight in sentiments) / total_weight
 
-            # Sort significant news by date and score
             significant_news.sort(key=lambda x: (
                 datetime.strptime(x['published_at'], "%Y-%m-%d %H:%M"),
                 abs(x['score'])
             ), reverse=True)
 
-            # Determine trend and confidence
             sentiment_trend = self._get_sentiment_trend(weighted_sentiment)
             confidence_score = min(len(relevant_articles) / 10, 1.0) * (1 + abs(weighted_sentiment))
 
