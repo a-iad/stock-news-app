@@ -15,8 +15,6 @@ if 'selected_period' not in st.session_state:
     st.session_state.selected_period = 'day'
 if 'show_add_position' not in st.session_state:
     st.session_state.show_add_position = False
-if 'news_cache' not in st.session_state:
-    st.session_state.news_cache = {}
 
 # Initialize components
 market_data = MarketData()
@@ -75,55 +73,46 @@ if not st.session_state.portfolio.holdings.empty:
     stocks = st.session_state.portfolio.holdings['Symbol'].tolist()
 
     for symbol in stocks:
-        # Main stock container
-        with st.container():
-            st.markdown("---")
-            st.markdown(f"## {symbol}")
+        # Stock container
+        st.markdown("---")
+        st.markdown(f"## {symbol}")
 
-            # Stock data
-            stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
-            if not stock_data.empty:
-                current_price = stock_data['Close'].iloc[-1]
-                price_change = ((current_price - stock_data['Close'].iloc[0]) / stock_data['Close'].iloc[0]) * 100
-                st.metric(
-                    "Current Price",
-                    f"${current_price:.2f}",
-                    f"{price_change:+.2f}% ({selected_period})"
-                )
+        # Stock data
+        stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
+        if not stock_data.empty:
+            current_price = stock_data['Close'].iloc[-1]
+            price_change = ((current_price - stock_data['Close'].iloc[0]) / stock_data['Close'].iloc[0]) * 100
+            st.metric(
+                "Current Price",
+                f"${current_price:.2f}",
+                f"{price_change:+.2f}% ({selected_period})"
+            )
 
-            # Remove button
-            if st.button("Remove", key=f"remove_{symbol}"):
-                st.session_state.portfolio.remove_position(symbol)
-                st.rerun()
+        # Remove button
+        if st.button("Remove", key=f"remove_{symbol}"):
+            st.session_state.portfolio.remove_position(symbol)
+            st.rerun()
 
-            # News section in a separate container
-            with st.container():
-                st.markdown("## Recent Market News")
+        # News section
+        st.markdown("## Recent Market News")
 
-                # Load news data
-                if symbol not in st.session_state.news_cache:
-                    with st.spinner(f"Loading news for {symbol}..."):
-                        st.session_state.news_cache[symbol] = market_data.get_news_analysis(symbol)
+        try:
+            # Fetch news directly without caching
+            news_data = market_data.get_news_analysis(symbol)
+            st.write(f"Debug: Fetched news data for {symbol}")
 
-                news_data = st.session_state.news_cache[symbol]
-
-                if news_data and news_data.get('articles'):
-                    for idx, article in enumerate(news_data['articles']):
-                        with st.expander(f"📰 {article['title']}", expanded=True):
-                            analysis = article.get('analysis', {})
-
-                            if analysis and analysis.get('significance'):
-                                st.markdown("### Analysis")
-                                st.write(analysis['significance'])
-
-                            col1, col2 = st.columns([1, 1])
-                            with col1:
-                                impact = analysis.get('market_impact', 'Ambivalent')
-                                st.info(f"Market Impact: {impact}")
-                            with col2:
-                                st.caption(f"Published: {article.get('published_at', 'N/A')}")
-                else:
-                    st.info("No recent news available for this stock.")
+            if news_data and news_data.get('articles'):
+                for article in news_data['articles']:
+                    with st.expander(f"📰 {article['title']}", expanded=True):
+                        analysis = article.get('analysis', {})
+                        if analysis and analysis.get('significance'):
+                            st.write(analysis['significance'])
+                            st.info(f"Market Impact: {analysis.get('market_impact', 'Ambivalent')}")
+                            st.caption(f"Published: {article.get('published_at', 'N/A')}")
+            else:
+                st.info("No recent news available for this stock.")
+        except Exception as e:
+            st.error(f"Error loading news: {str(e)}")
 
 else:
     st.info("Add positions to your portfolio to view stock analysis")
