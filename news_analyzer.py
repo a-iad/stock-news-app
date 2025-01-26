@@ -21,7 +21,9 @@ class NewsAnalyzer:
         """Make an API call to DeepSeek with detailed logging."""
         try:
             print("\nCalling DeepSeek API...")
-            print(f"API URL: {self.deepseek_url}")
+            if not self.deepseek_api_key:
+                print("ERROR: DEEPSEEK_API_KEY not found")
+                return None
 
             headers = {
                 "Authorization": f"Bearer {self.deepseek_api_key}",
@@ -34,7 +36,6 @@ class NewsAnalyzer:
                 "temperature": 0.7
             }
 
-            print("Sending request to DeepSeek API...")
             response = requests.post(
                 self.deepseek_url,
                 headers=headers,
@@ -42,85 +43,50 @@ class NewsAnalyzer:
                 timeout=30
             )
 
-            print(f"DeepSeek API Response Status: {response.status_code}")
-
+            print(f"Response status: {response.status_code}")
             if response.status_code == 200:
                 result = response.json()
-                if 'choices' in result and len(result['choices']) > 0:
-                    content = result['choices'][0]['message']['content']
-                    print("Successfully received analysis from DeepSeek")
-                    return json.loads(content)
-                else:
-                    print("Error: Unexpected response format from DeepSeek")
-                    print(f"Response: {result}")
-            else:
-                print(f"Error: DeepSeek API returned status {response.status_code}")
-                print(f"Response: {response.text}")
+                if 'choices' in result and result['choices']:
+                    return json.loads(result['choices'][0]['message']['content'])
 
+            print(f"API Error: {response.text}")
             return None
 
-        except json.JSONDecodeError as e:
-            print(f"Error decoding DeepSeek response: {str(e)}")
-            print(f"Raw response: {response.text if 'response' in locals() else 'No response'}")
-            return None
         except Exception as e:
-            print(f"Error calling DeepSeek API: {str(e)}")
+            print(f"DeepSeek API error: {str(e)}")
             traceback.print_exc()
             return None
 
     def _analyze_article(self, article: Dict[str, Any], symbol: str, company_name: str) -> Dict[str, Any]:
-        """Deep analysis of individual articles using DeepSeek AI."""
+        """Analyze article using DeepSeek AI focusing on stock impact."""
         if not article.get('title') or not article.get('description'):
             return None
 
         try:
             if self.deepseek_api_key:
                 prompt = (
-                    f"You are a senior Wall Street analyst producing a detailed research note about this news regarding {symbol} ({company_name if company_name else 'unknown company'}).\n\n"
-                    f"NEWS ARTICLE:\nHeadline: {article['title']}\nContent: {article['description']}\n\n"
-                    "Provide an institutional-quality analysis in JSON format with these components:\n\n"
-                    "1. article_summary: A concise yet information-rich summary that captures:\n"
-                    "   - The core news/announcement\n"
-                    "   - Key metrics and numbers mentioned\n"
-                    "   - Any comparative data points\n"
-                    "   - Market reaction if mentioned\n"
-                    "Max 3-4 sentences, but pack them with specific details.\n\n"
-                    "2. deep_analysis: A thorough examination (minimum 4 paragraphs) that covers:\n"
-                    "   - Immediate Business Impact: How does this affect revenue, margins, market share, or competitive position?\n" 
-                    "   - Strategic Implications: What does this reveal about the company's strategy, execution, or market position?\n"
-                    "   - Competitive Analysis: How does this change their standing vs competitors? What advantages/disadvantages emerge?\n"
-                    "   - Market Context: How does this fit into broader industry trends or market dynamics?\n"
-                    "   - Forward-Looking View: What are the longer-term implications? What should investors watch for next?\n"
-                    "Be specific, use numbers where possible, and make meaningful connections.\n\n"
-                    "3. market_impact: One of:\n"
-                    "   - Very Positive: Strong positive reassessment of business outlook likely\n"
-                    "   - Somewhat Positive: Incrementally positive but questions remain\n"
-                    "   - Ambivalent: Mixed implications or unclear impact\n"
-                    "   - Somewhat Negative: Concerning implications but not catastrophic\n"
-                    "   - Very Negative: Significant negative reassessment warranted\n\n"
-                    "4. trading_thesis: A specific explanation of:\n"
-                    "   - Why the chosen market impact rating is justified\n"
-                    "   - What metrics or developments could change this view\n"
-                    "   - Key risks to this interpretation\n"
-                    "   - Timeline for when impact should become visible in results\n\n"
-                    "Example high-quality response:\n"
+                    f"Analyze this news about {symbol} ({company_name if company_name else 'unknown company'}):\n\n"
+                    f"TITLE: {article['title']}\n"
+                    f"CONTENT: {article['description']}\n\n"
+                    "Provide two things:\n"
+                    "1. A clear, factual summary of the key points and numbers\n"
+                    "2. A detailed paragraph analyzing how this could affect the stock price, including:\n"
+                    "   - Specific business metrics impacted\n"
+                    "   - Comparison to market expectations\n"
+                    "   - Competitive implications\n"
+                    "   - Timeline for impact\n\n"
+                    "Format response as JSON:\n"
                     "{\n"
-                    '  "article_summary": "Apple reported Q4 iPhone revenue of $69.7B (+15% YoY), with particularly strong growth in China (+22% YoY) and India (+40% YoY). ASPs increased 7% to $931 driven by Pro model mix, while margins expanded 180bps to 42.1%. Management guided to double-digit growth continuing in Q1 on strong demand and easing supply constraints.",\n'
-                    '  "deep_analysis": "This quarter marks a decisive shift in Apple\'s growth trajectory and competitive positioning. The 15% iPhone revenue growth significantly outpaced expectations of 8-10%, with the mix shift toward Pro models (estimated 65% of units vs 58% last year) demonstrating Apple\'s pricing power and brand strength even in a challenging consumer environment.\n\nThe China performance is particularly noteworthy given macro concerns and Huawei\'s resurgence. The 22% growth suggests Apple\'s premium positioning and ecosystem strategy are resonating strongly, with management noting customer satisfaction scores reaching new highs. The 40% India growth, while off a smaller base, validates Apple\'s investment in local manufacturing and retail presence.\n\nMargin expansion of 180bps to 42.1% reflects both the favorable mix and improving supply chain efficiency. This level of profitability is unprecedented in consumer hardware and creates substantial resources for R&D investment in emerging areas like AR/VR and AI, where Apple\'s vertical integration could provide significant advantages.\n\nLooking forward, the strong Q1 guide suggests the 15 Pro/Pro Max supply constraints are easing while demand remains robust. The increasing Pro mix and growing services attachment rate (now 71% of active devices) points to sustained margin strength. Watch for expanding India manufacturing capacity and potential AI-driven features in iOS 18 as additional growth drivers.",\n'
-                    '  "market_impact": "Very Positive",\n'
-                    '  "trading_thesis": "The combination of accelerating growth, expanding margins, and strong emerging market performance justifies a positive re-rating of Apple\'s multiple. The Pro model mix shift suggests pricing power remains strong despite macro concerns, while India momentum adds a new growth vector. Key metrics to watch include Pro model lead times, China market share data, and iOS 18 features/adoption. Primary risk is high bar set for iPhone 16 cycle. Impact should be visible in sustained ASP growth starting next quarter, with full benefits to margin profile evident by mid-2024."\n'
-                    "}\n\n"
-                    "Your analysis should match this level of depth and specificity. Focus on connecting dots between news, business impact, and stock implications. Avoid generic statements - provide concrete insights an investor could act on."
+                    '  "article_summary": "Factual summary with key points and numbers",\n'
+                    '  "significance": "Detailed analysis of stock price impact",\n'
+                    '  "market_impact": "Very Positive|Somewhat Positive|Ambivalent|Somewhat Negative|Very Negative",\n'
+                    '  "impact_explanation": "Brief justification of market impact rating"\n'
+                    "}"
                 )
 
                 analysis = self._call_deepseek_api(prompt)
                 if analysis:
-                    return {
-                        'article_summary': analysis['article_summary'],
-                        'significance': analysis['deep_analysis'],
-                        'market_impact': analysis['market_impact'],
-                        'impact_explanation': analysis['trading_thesis']
-                    }
+                    return analysis
 
             print("Falling back to simple analysis")
             return self._simple_analysis(article['title'], article['description'])
