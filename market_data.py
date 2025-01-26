@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from predictions import MarketPredictor
 from news_analyzer import NewsAnalyzer
+import traceback
 
 class MarketData:
     def __init__(self):
@@ -16,21 +17,22 @@ class MarketData:
             print(f"\nFetching news analysis for {symbol}")
             ticker = yf.Ticker(symbol)
             company_name = ticker.info.get('longName', '')
+            print(f"Company name: {company_name}")
 
             news_data = self.news_analyzer.fetch_relevant_news(symbol, company_name)
-            if news_data:
+            if news_data and news_data.get('articles'):
                 print(f"Successfully fetched news for {symbol}")
-                if news_data.get('articles'):
-                    print(f"Found {len(news_data['articles'])} articles")
+                print(f"Found {len(news_data['articles'])} articles")
                 if news_data.get('summary_analysis'):
                     print("Generated summary analysis")
                 return news_data
-            else:
-                print(f"No news data returned for {symbol}")
-            return None
+
+            print(f"No news data returned for {symbol}")
+            return {'summary_analysis': None, 'articles': []}
         except Exception as e:
             print(f"Error in get_news_analysis for {symbol}: {str(e)}")
-            return None
+            traceback.print_exc()
+            return {'summary_analysis': None, 'articles': []}
 
     @staticmethod
     def get_stock_data(symbol, period='1mo'):

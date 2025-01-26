@@ -95,25 +95,25 @@ if not st.session_state.portfolio.holdings.empty:
                     # Get news analysis
                     news_data = market_data.get_news_analysis(symbol)
 
-                    if news_data and news_data['summary_analysis']:
+                    if news_data and news_data.get('articles'):
                         # Display key summary points with impacts
-                        st.write("**Key Market Updates:**")
-
-                        for point in news_data['summary_analysis']['key_points']:
-                            with st.container():
-                                st.markdown(f"""
-                                <div style='margin-bottom: 15px;'>
-                                    <p style='margin-bottom: 5px;'><strong>{point['point']}</strong></p>
-                                    <div style='padding: 10px; background-color: rgba(0,0,0,0.05);'>
-                                        <strong>Impact Analysis:</strong><br>
-                                        {point['impact']}
+                        if news_data.get('summary_analysis'):
+                            st.write("**Key Market Updates:**")
+                            for point in news_data['summary_analysis'].get('key_points', []):
+                                with st.container():
+                                    st.markdown(f"""
+                                    <div style='margin-bottom: 15px;'>
+                                        <p style='margin-bottom: 5px;'><strong>{point['point']}</strong></p>
+                                        <div style='padding: 10px; background-color: rgba(0,0,0,0.05);'>
+                                            <strong>Impact Analysis:</strong><br>
+                                            {point['impact']}
+                                        </div>
                                     </div>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                    """, unsafe_allow_html=True)
 
                         # Display recent articles
                         st.write("**Recent Articles:**")
-                        for article in news_data['articles'][:4]:
+                        for article in news_data['articles']:
                             st.markdown("---")
 
                             # Article header with title
@@ -126,12 +126,13 @@ if not st.session_state.portfolio.holdings.empty:
                                 # Summary
                                 st.write(article['summary'])
 
-                                if article['analysis'].get('market_relevance'):
+                                if article.get('analysis', {}).get('market_relevance'):
                                     st.markdown(f"*Why it matters: {article['analysis']['market_relevance']}*")
 
                             with col_analysis:
                                 # Impact analysis
-                                impact = article['analysis'].get('potential_impact', 'Neutral')
+                                analysis = article.get('analysis', {})
+                                impact = analysis.get('potential_impact', 'Neutral')
                                 impact_color = (
                                     "green" if impact == "Positive"
                                     else "red" if impact == "Negative"
@@ -141,9 +142,9 @@ if not st.session_state.portfolio.holdings.empty:
                                 st.markdown(f"""
                                 <div style='padding: 10px; border: 1px solid {impact_color}; border-radius: 5px;'>
                                     <p><strong>Market Impact:</strong> {impact}</p>
-                                    <p><strong>Confidence:</strong> {article['analysis'].get('confidence', 50)}%</p>
-                                    {f"<p><strong>Historical Context:</strong> {article['analysis']['historical_context']}</p>"
-                                    if article['analysis'].get('historical_context') else ""}
+                                    <p><strong>Confidence:</strong> {analysis.get('confidence', 50)}%</p>
+                                    {f"<p><strong>Historical Context:</strong> {analysis['historical_context']}</p>"
+                                    if analysis.get('historical_context') else ""}
                                 </div>
                                 """, unsafe_allow_html=True)
 
