@@ -141,17 +141,18 @@ class NewsAnalyzer:
             return None
 
         try:
-            # First try DeepSeek analysis
+            # Always try DeepSeek analysis first
             if self.deepseek_api_key:
                 prompt = (
-                    f"Analyze this news article about {symbol}:\n"
+                    f"Analyze this news article about {symbol} stock:\n"
                     f"Title: {article['title']}\n"
                     f"Content: {article['description']}\n\n"
-                    "Provide:\n"
-                    "1. Market relevance (specific reason why this matters)\n"
-                    "2. Potential impact on the stock (positive/negative/neutral with reasoning)\n"
-                    "3. Confidence in the analysis (0-100)\n"
-                    "4. Historical context or similar past events if applicable\n\n"
+                    "Provide analysis in this format:\n"
+                    "1. Market relevance: Explain specifically how this news affects the stock's business, operations, or market position\n"
+                    "2. Potential impact: Analyze if this is positive/negative/neutral for the stock price and explain why\n"
+                    "3. Confidence: Rate 0-100 how confident you are in this analysis\n"
+                    "4. Historical context: Mention any similar past events or patterns\n\n"
+                    "Be specific about the connection between the news and the stock. Focus on direct business implications.\n\n"
                     "Format: JSON with keys 'market_relevance', 'potential_impact', 'confidence', 'historical_context'"
                 )
 
@@ -172,7 +173,7 @@ class NewsAnalyzer:
                 if response.status_code == 200:
                     return json.loads(response.json()['choices'][0]['message']['content'])
 
-            # Fallback to simple analysis
+            # Fallback to enhanced simple analysis
             return self._simple_analysis(article['title'], article['description'])
 
         except Exception as e:
@@ -180,21 +181,45 @@ class NewsAnalyzer:
             return self._simple_analysis(article['title'], article['description'])
 
     def _simple_analysis(self, title: str, description: str) -> Dict[str, Any]:
-        """Fallback simple analysis when DeepSeek is unavailable."""
+        """Enhanced fallback simple analysis when DeepSeek is unavailable."""
         text = (title + ' ' + description).lower()
-        impact_terms = {
-            'positive': ['surge', 'gain', 'rise', 'growth', 'profit', 'success'],
-            'negative': ['fall', 'drop', 'decline', 'loss', 'risk', 'down']
+
+        # Enhanced keyword analysis
+        business_terms = {
+            'revenue': ['revenue', 'sales', 'earnings'],
+            'operations': ['production', 'operations', 'expansion'],
+            'market': ['market share', 'competition', 'industry'],
+            'product': ['product', 'service', 'launch'],
+            'financial': ['profit', 'margin', 'cost']
         }
 
+        impact_terms = {
+            'positive': ['surge', 'gain', 'rise', 'growth', 'profit', 'success', 'beat', 'exceed'],
+            'negative': ['fall', 'drop', 'decline', 'loss', 'risk', 'down', 'miss', 'below']
+        }
+
+        # Analyze business aspects
+        business_aspects = []
+        for aspect, terms in business_terms.items():
+            if any(term in text for term in terms):
+                business_aspects.append(aspect)
+
+        # Analyze sentiment
         sentiment = {'positive': 0, 'negative': 0}
         for impact, terms in impact_terms.items():
             sentiment[impact] = sum(1 for term in terms if term in text)
 
+        # Generate relevance explanation
+        if business_aspects:
+            relevance = f"News impacts company's {', '.join(business_aspects)}"
+        else:
+            relevance = "General market news that may affect the stock price"
+
+        # Determine impact
         total = sum(sentiment.values())
         if total == 0:
             return {
-                'market_relevance': 'General market news that may affect the stock',
+                'market_relevance': relevance,
                 'potential_impact': 'Neutral',
                 'confidence': 50,
                 'historical_context': None
@@ -212,7 +237,7 @@ class NewsAnalyzer:
             confidence = 60
 
         return {
-            'market_relevance': 'Article contains significant market-related indicators',
+            'market_relevance': relevance,
             'potential_impact': impact,
             'confidence': confidence,
             'historical_context': None
