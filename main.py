@@ -97,22 +97,30 @@ if not st.session_state.portfolio.holdings.empty:
         st.markdown("## Recent Market News")
 
         try:
-            # Fetch news directly without caching
+            # Fetch news directly
+            st.info(f"Loading news for {symbol}...")
             news_data = market_data.get_news_analysis(symbol)
-            st.write(f"Debug: Fetched news data for {symbol}")
+
+            # Debug information
+            st.write("Debug: News data received")
+            st.write(f"Debug: Number of articles: {len(news_data.get('articles', []))}")
 
             if news_data and news_data.get('articles'):
                 for article in news_data['articles']:
-                    with st.expander(f"📰 {article['title']}", expanded=True):
+                    with st.container():
+                        st.markdown("---")
+                        st.markdown(f"### {article['title']}")
+
                         analysis = article.get('analysis', {})
                         if analysis and analysis.get('significance'):
                             st.write(analysis['significance'])
                             st.info(f"Market Impact: {analysis.get('market_impact', 'Ambivalent')}")
                             st.caption(f"Published: {article.get('published_at', 'N/A')}")
             else:
-                st.info("No recent news available for this stock.")
+                st.warning("No recent news available for this stock.")
         except Exception as e:
             st.error(f"Error loading news: {str(e)}")
+            st.write("Debug: Exception details", e)
 
 else:
     st.info("Add positions to your portfolio to view stock analysis")
