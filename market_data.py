@@ -20,19 +20,23 @@ class MarketData:
             print(f"Company name: {company_name}")
 
             news_data = self.news_analyzer.fetch_relevant_news(symbol, company_name)
-            if news_data and news_data.get('articles'):
+
+            # Add debug prints
+            print(f"News data type: {type(news_data)}")
+            print(f"News data content: {news_data}")
+
+            if news_data and isinstance(news_data, dict) and news_data.get('articles'):
                 print(f"Successfully fetched news for {symbol}")
                 print(f"Found {len(news_data['articles'])} articles")
-                if news_data.get('summary_analysis'):
-                    print("Generated summary analysis")
                 return news_data
 
             print(f"No news data returned for {symbol}")
-            return {'summary_analysis': None, 'articles': []}
+            return {'articles': [], 'error': 'No news data available'}
+
         except Exception as e:
             print(f"Error in get_news_analysis for {symbol}: {str(e)}")
             traceback.print_exc()
-            return {'summary_analysis': None, 'articles': []}
+            return {'articles': [], 'error': str(e)}
 
     @staticmethod
     def get_stock_data(symbol, period='1mo'):

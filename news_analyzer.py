@@ -78,11 +78,11 @@ class NewsAnalyzer:
             if self.deepseek_api_key:
                 prompt = (
                     f"Article: {article['title']}\n{article['description']}\n\n"
-                    "Analyze this article and provide:\n"
-                    "1. A detailed explanation of its potential market impact\n"
-                    "2. Key business metrics and market expectations affected\n"
-                    "3. Specific implications for stock performance\n\n"
-                    "Provide a thorough analysis with clear reasoning."
+                    "Provide a brief analysis (max 200 words):\n"
+                    "1. Key takeaway in one sentence\n"
+                    "2. Potential market impact (positive/negative/neutral)\n"
+                    "3. One specific implication for stock performance\n"
+                    "Keep responses clear and concise."
                 )
 
                 analysis = self._call_deepseek_api(prompt)
@@ -90,10 +90,10 @@ class NewsAnalyzer:
                     return {
                         'article_summary': article['title'],
                         'significance': analysis,
-                        'market_impact': 'Very Positive' if 'exceed' in analysis.lower() or 'growth' in analysis.lower()
-                                  else 'Somewhat Positive' if 'increase' in analysis.lower() or 'improvement' in analysis.lower()
-                                  else 'Very Negative' if 'miss' in analysis.lower() or 'decline' in analysis.lower()
-                                  else 'Somewhat Negative' if 'below' in analysis.lower() or 'risk' in analysis.lower()
+                        'market_impact': 'Very Positive' if 'positive' in analysis.lower() 
+                                  else 'Somewhat Positive' if 'increase' in analysis.lower()
+                                  else 'Very Negative' if 'negative' in analysis.lower()
+                                  else 'Somewhat Negative' if 'decline' in analysis.lower()
                                   else 'Ambivalent',
                         'impact_explanation': analysis
                     }
