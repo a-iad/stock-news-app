@@ -99,56 +99,50 @@ if not st.session_state.portfolio.holdings.empty:
         st.subheader("Recent Market News")
         news_data = market_data.get_news_analysis(symbol)
 
-        # Create a scrollable container for news
-        news_container = st.container()
-
-        # Display news articles in scrollable container
         if news_data and news_data.get('articles'):
             for article in news_data['articles']:
-                with news_container:
-                    st.markdown("---")
+                st.markdown("---")
 
-                    # Article title with proper styling
+                # Article title with proper styling
+                st.markdown(f"""
+                    <div style='margin-bottom: 10px;'>
+                        <h3>{article['title']}</h3>
+                    </div>
+                """, unsafe_allow_html=True)
+
+                # Market Impact and Analysis
+                analysis = article.get('analysis', {})
+                impact = analysis.get('market_impact', 'Ambivalent')
+
+                impact_colors = {
+                    'Very Positive': '#1b5e20',
+                    'Somewhat Positive': '#2e7d32',
+                    'Ambivalent': '#666666',
+                    'Somewhat Negative': '#c62828',
+                    'Very Negative': '#b71c1c'
+                }
+                impact_color = impact_colors.get(impact, '#666666')
+
+                # Main content area
+                if analysis.get('significance'):
                     st.markdown(f"""
-                        <div style='margin-bottom: 10px;'>
-                            <h3>{article['title']}</h3>
-                        </div>
+                    <div style='margin: 10px 0; padding: 15px; background-color: #f0f2f6; border-radius: 5px;'>
+                        <h4 style='margin-bottom: 10px; color: #1a237e;'>Analysis</h4>
+                        <p style='font-size: 14px; line-height: 1.6; white-space: pre-wrap;'>{analysis['significance']}</p>
+                    </div>
                     """, unsafe_allow_html=True)
 
-                    # Market Impact and Analysis
-                    analysis = article.get('analysis', {})
-                    impact = analysis.get('market_impact', 'Ambivalent')
+                # Market Impact badge
+                st.markdown(f"""
+                <div style='padding: 10px; border: 2px solid {impact_color}; border-radius: 5px; display: inline-block;'>
+                    <p style='color: {impact_color}; font-weight: bold; margin: 0;'>Market Impact: {impact}</p>
+                </div>
+                """, unsafe_allow_html=True)
 
-                    impact_colors = {
-                        'Very Positive': '#1b5e20',
-                        'Somewhat Positive': '#2e7d32',
-                        'Ambivalent': '#666666',
-                        'Somewhat Negative': '#c62828',
-                        'Very Negative': '#b71c1c'
-                    }
-                    impact_color = impact_colors.get(impact, '#666666')
-
-                    # Main content area
-                    with st.expander("View Analysis", expanded=True):
-                        if analysis.get('significance'):
-                            st.markdown(f"""
-                            <div style='margin: 10px 0; padding: 15px; background-color: #f0f2f6; border-radius: 5px;'>
-                                <h4 style='margin-bottom: 10px; color: #1a237e;'>Analysis</h4>
-                                <p style='font-size: 14px; line-height: 1.6; white-space: pre-wrap;'>{analysis['significance']}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                        # Market Impact badge
-                        st.markdown(f"""
-                        <div style='padding: 10px; border: 2px solid {impact_color}; border-radius: 5px; display: inline-block;'>
-                            <p style='color: {impact_color}; font-weight: bold; margin: 0;'>Market Impact: {impact}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    st.caption(f"Published: {article.get('published_at', 'N/A')}")
-                    st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+                st.caption(f"Published: {article.get('published_at', 'N/A')}")
+                st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
         else:
-            news_container.info("No recent news available for this stock.")
+            st.info("No recent news available for this stock.")
 
 else:
     st.info("Add positions to your portfolio to view stock analysis")
