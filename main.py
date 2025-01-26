@@ -92,32 +92,28 @@ if not st.session_state.portfolio.holdings.empty:
             st.session_state.portfolio.remove_position(symbol)
             st.rerun()
 
-        # News section
-        st.subheader("Recent Market News")
+        st.markdown("## Recent Market News")
         news_data = market_data.get_news_analysis(symbol)
+
+        # Debug print
+        st.write(f"Found {len(news_data.get('articles', []))} articles")
 
         if news_data and news_data.get('articles'):
             for article in news_data['articles']:
                 st.markdown("---")
+                st.write(article['title'])
 
-                # Title
-                st.markdown(f"### {article['title']}")
-
-                # Analysis
                 analysis = article.get('analysis', {})
                 if analysis and analysis.get('significance'):
-                    st.text("Analysis:")
+                    st.write("Analysis:")
                     st.write(analysis['significance'])
 
-                # Market Impact
                 impact = analysis.get('market_impact', 'Ambivalent')
-                st.text(f"Market Impact: {impact}")
-
-                # Date
-                st.text(f"Published: {article.get('published_at', 'N/A')}")
-                st.markdown(" ")  # Add space between articles
+                st.write(f"Market Impact: {impact}")
+                st.write(f"Published: {article.get('published_at', 'N/A')}")
+                st.write("")  # Add space between articles
         else:
-            st.info("No recent news available for this stock.")
+            st.write("No recent news available for this stock.")
 
 else:
     st.info("Add positions to your portfolio to view stock analysis")
