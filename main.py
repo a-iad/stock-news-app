@@ -99,14 +99,21 @@ if not st.session_state.portfolio.holdings.empty:
         st.subheader("Recent Market News")
         news_data = market_data.get_news_analysis(symbol)
 
-        # Display news articles
+        # Create a scrollable container for news
+        news_container = st.container()
+
+        # Display news articles in scrollable container
         if news_data and news_data.get('articles'):
             for article in news_data['articles']:
-                with st.container():
+                with news_container:
                     st.markdown("---")
 
-                    # Article title
-                    st.markdown(f"### {article['title']}")
+                    # Article title with proper styling
+                    st.markdown(f"""
+                        <div style='margin-bottom: 10px;'>
+                            <h3>{article['title']}</h3>
+                        </div>
+                    """, unsafe_allow_html=True)
 
                     # Summary and Analysis
                     if article.get('article_summary'):
@@ -117,7 +124,7 @@ if not st.session_state.portfolio.holdings.empty:
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # Market Impact
+                    # Market Impact and Analysis
                     analysis = article.get('analysis', {})
                     impact = analysis.get('market_impact', 'Ambivalent')
 
@@ -133,27 +140,26 @@ if not st.session_state.portfolio.holdings.empty:
                     col1, col2 = st.columns([4, 1])
 
                     with col1:
-                        # Enhanced Why It Matters section
                         if analysis.get('significance'):
                             st.markdown(f"""
-                            <div style='margin-top: 20px; padding: 20px; background-color: #f0f2f6; border-radius: 5px;'>
+                            <div style='margin-top: 10px; padding: 15px; background-color: #f0f2f6; border-radius: 5px;'>
                                 <h4 style='margin-bottom: 10px; color: #1a237e;'>Why It Matters</h4>
-                                <p style='font-size: 16px; line-height: 1.6;'>{analysis['significance']}</p>
+                                <p style='font-size: 14px; line-height: 1.5;'>{analysis['significance']}</p>
                             </div>
                             """, unsafe_allow_html=True)
 
                     with col2:
                         st.markdown(f"""
-                        <div style='padding: 15px; border: 2px solid {impact_color}; border-radius: 5px; margin-top: 20px;'>
-                            <p style='color: {impact_color}; font-weight: bold; margin-bottom: 10px;'>Market Impact</p>
-                            <p style='font-size: 16px; font-weight: bold;'>{impact}</p>
-                            <p style='font-style: italic; font-size: 14px;'>{analysis.get('impact_explanation', '')}</p>
+                        <div style='padding: 10px; border: 2px solid {impact_color}; border-radius: 5px;'>
+                            <p style='color: {impact_color}; font-weight: bold; margin: 5px 0;'>Market Impact</p>
+                            <p style='font-size: 14px; font-weight: bold; margin: 5px 0;'>{impact}</p>
                         </div>
                         """, unsafe_allow_html=True)
 
                     st.caption(f"Published: {article.get('published_at', 'N/A')}")
+                    st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
         else:
-            st.info("No recent news available for this stock.")
+            news_container.info("No recent news available for this stock.")
 
 else:
     st.info("Add positions to your portfolio to view stock analysis")
