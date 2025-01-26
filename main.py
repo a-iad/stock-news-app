@@ -99,19 +99,9 @@ if not st.session_state.portfolio.holdings.empty:
         st.subheader("Recent Market News")
         news_data = market_data.get_news_analysis(symbol)
 
-        # Create scrollable container with fixed height
-        with st.container():
-            # Allow scrolling within this height
-            st.markdown("""
-                <style>
-                    .stMarkdown {
-                        max-height: 600px;
-                        overflow-y: auto;
-                        padding-right: 20px;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
-
+        # Create scrollable container for news
+        scroll_container = st.empty()
+        with scroll_container.container():
             if news_data and news_data.get('articles'):
                 for article in news_data['articles']:
                     st.markdown("---")
