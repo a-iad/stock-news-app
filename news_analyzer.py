@@ -20,9 +20,10 @@ class NewsAnalyzer:
     def _call_deepseek_api(self, prompt: str) -> Dict[str, Any]:
         """Make an API call to DeepSeek with detailed logging."""
         try:
-            print("\nCalling DeepSeek API...")
+            print(f"\nMaking DeepSeek API call...")
+
             if not self.deepseek_api_key:
-                print("ERROR: DEEPSEEK_API_KEY not found")
+                print("ERROR: No DeepSeek API key found")
                 return None
 
             headers = {
@@ -33,7 +34,8 @@ class NewsAnalyzer:
             data = {
                 "model": "deepseek-chat",
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7
+                "temperature": 0.7,
+                "max_tokens": 1000
             }
 
             response = requests.post(
@@ -43,56 +45,60 @@ class NewsAnalyzer:
                 timeout=30
             )
 
-            print(f"Response status: {response.status_code}")
-            if response.status_code == 200:
-                result = response.json()
-                if 'choices' in result and result['choices']:
-                    return json.loads(result['choices'][0]['message']['content'])
+            if response.status_code != 200:
+                print(f"DeepSeek API Error {response.status_code}: {response.text}")
+                return None
 
-            print(f"API Error: {response.text}")
-            return None
+            result = response.json()
+            if not result.get('choices'):
+                print("No choices in DeepSeek response")
+                return None
+
+            return json.loads(result['choices'][0]['message']['content'])
 
         except Exception as e:
-            print(f"DeepSeek API error: {str(e)}")
+            print(f"DeepSeek API call failed: {str(e)}")
             traceback.print_exc()
             return None
 
     def _analyze_article(self, article: Dict[str, Any], symbol: str, company_name: str) -> Dict[str, Any]:
-        """Analyze article using DeepSeek AI focusing on stock impact."""
+        """Get focused stock impact analysis from DeepSeek."""
         if not article.get('title') or not article.get('description'):
             return None
 
         try:
             if self.deepseek_api_key:
                 prompt = (
-                    f"Analyze this news about {symbol} ({company_name if company_name else 'unknown company'}):\n\n"
+                    f"You are a Wall Street analyst. For this news about {symbol}:\n\n"
                     f"TITLE: {article['title']}\n"
                     f"CONTENT: {article['description']}\n\n"
-                    "Provide two things:\n"
-                    "1. A clear, factual summary of the key points and numbers\n"
-                    "2. A detailed paragraph analyzing how this could affect the stock price, including:\n"
-                    "   - Specific business metrics impacted\n"
-                    "   - Comparison to market expectations\n"
-                    "   - Competitive implications\n"
-                    "   - Timeline for impact\n\n"
-                    "Format response as JSON:\n"
+                    "Provide:\n"
+                    "1. A clear summary of the news and key facts\n"
+                    "2. Analysis of potential stock price impact. Focus on specific reasons why this matters for the stock price "
+                    "including business metrics, competitive position, and market expectations.\n\n"
+                    "Format as JSON:\n"
                     "{\n"
-                    '  "article_summary": "Factual summary with key points and numbers",\n'
-                    '  "significance": "Detailed analysis of stock price impact",\n'
-                    '  "market_impact": "Very Positive|Somewhat Positive|Ambivalent|Somewhat Negative|Very Negative",\n'
-                    '  "impact_explanation": "Brief justification of market impact rating"\n'
+                    '  "summary": "clear summary of the news",\n'
+                    '  "stock_impact": "detailed paragraph on why this matters for the stock price and what metrics to watch"\n'
                     "}"
                 )
 
-                analysis = self._call_deepseek_api(prompt)
-                if analysis:
-                    return analysis
+                result = self._call_deepseek_api(prompt)
+                if result:
+                    # Transform the response into our existing frontend format
+                    return {
+                        'article_summary': result['summary'],
+                        'significance': result['stock_impact'],
+                        'market_impact': 'Somewhat Positive',  # We'll derive this from the content later
+                        'impact_explanation': result['stock_impact']
+                    }
 
             print("Falling back to simple analysis")
             return self._simple_analysis(article['title'], article['description'])
 
         except Exception as e:
-            print(f"Error analyzing article: {str(e)}")
+            print(f"Article analysis failed: {str(e)}")
+            traceback.print_exc()
             return self._simple_analysis(article['title'], article['description'])
 
     def _simple_analysis(self, title: str, description: str) -> Dict[str, Any]:
