@@ -81,46 +81,48 @@ class NewsAnalyzer:
             return {'articles': []}
 
     def _analyze_article(self, article: Dict[str, Any], symbol: str, company_name: str) -> Dict[str, Any]:
-        """Analyze individual article for relevance and impact."""
+        """Deep analysis of individual articles using DeepSeek AI."""
         if not article.get('title') or not article.get('description'):
             return None
 
         try:
             if self.deepseek_api_key:
                 prompt = (
-                    f"As an expert financial analyst, provide a comprehensive analysis of this news about {symbol} ({company_name if company_name else 'unknown company'}):\n"
-                    f"Title: {article['title']}\n"
-                    f"Content: {article['description']}\n\n"
-                    "Provide a detailed analysis in JSON format with these components:\n\n"
-                    "1. article_summary: A detailed yet concise summary focusing on key business implications and market impact. "
-                    "Highlight specific numbers, business metrics, or strategic changes mentioned. "
-                    "3-4 sentences maximum.\n\n"
-                    "2. significance: A thorough analysis (4-6 sentences) that explains:\n"
-                    "   - Direct business impact on revenue, margins, or market share\n"
-                    "   - Strategic implications for competitive position\n"
-                    "   - Effect on growth trajectory or business model\n"
-                    "   - Connection to broader market trends or industry shifts\n"
-                    "   - Long-term implications for the company's strategic position\n"
-                    "Include specific metrics, competitor comparisons, and market context where relevant.\n\n"
-                    "3. market_impact: One of these values based on comprehensive analysis:\n"
-                    "   - 'Very Positive': Strong upward pressure with clear long-term benefits\n"
-                    "   - 'Somewhat Positive': Moderate upward influence with some uncertainties\n"
-                    "   - 'Ambivalent': Mixed implications or unclear long-term impact\n"
-                    "   - 'Somewhat Negative': Moderate concerns with potential mitigating factors\n"
-                    "   - 'Very Negative': Significant challenges with lasting implications\n\n"
-                    "4. impact_explanation: A detailed explanation connecting the news to likely stock movement, including:\n"
-                    "   - Effect on key business metrics\n"
-                    "   - Comparison to market expectations\n"
-                    "   - Potential investor reaction\n"
-                    "   - Timeline for impact\n\n"
-                    "Example format:\n"
+                    f"You are a senior Wall Street analyst producing a detailed research note about this news regarding {symbol} ({company_name if company_name else 'unknown company'}).\n\n"
+                    f"NEWS ARTICLE:\nHeadline: {article['title']}\nContent: {article['description']}\n\n"
+                    "Provide an institutional-quality analysis in JSON format with these components:\n\n"
+                    "1. article_summary: A concise yet information-rich summary that captures:\n"
+                    "   - The core news/announcement\n"
+                    "   - Key metrics and numbers mentioned\n"
+                    "   - Any comparative data points\n"
+                    "   - Market reaction if mentioned\n"
+                    "Max 3-4 sentences, but pack them with specific details.\n\n"
+                    "2. deep_analysis: A thorough examination (minimum 4 paragraphs) that covers:\n"
+                    "   - Immediate Business Impact: How does this affect revenue, margins, market share, or competitive position?\n" 
+                    "   - Strategic Implications: What does this reveal about the company's strategy, execution, or market position?\n"
+                    "   - Competitive Analysis: How does this change their standing vs competitors? What advantages/disadvantages emerge?\n"
+                    "   - Market Context: How does this fit into broader industry trends or market dynamics?\n"
+                    "   - Forward-Looking View: What are the longer-term implications? What should investors watch for next?\n"
+                    "Be specific, use numbers where possible, and make meaningful connections.\n\n"
+                    "3. market_impact: One of:\n"
+                    "   - Very Positive: Strong positive reassessment of business outlook likely\n"
+                    "   - Somewhat Positive: Incrementally positive but questions remain\n"
+                    "   - Ambivalent: Mixed implications or unclear impact\n"
+                    "   - Somewhat Negative: Concerning implications but not catastrophic\n"
+                    "   - Very Negative: Significant negative reassessment warranted\n\n"
+                    "4. trading_thesis: A specific explanation of:\n"
+                    "   - Why the chosen market impact rating is justified\n"
+                    "   - What metrics or developments could change this view\n"
+                    "   - Key risks to this interpretation\n"
+                    "   - Timeline for when impact should become visible in results\n\n"
+                    "Example high-quality response:\n"
                     "{\n"
-                    '  "article_summary": "Microsoft reported exceptional Q4 cloud revenue growth of 30% YoY to $25B, significantly outpacing market expectations of 25%. Azure gained 3% market share against AWS while expanding operating margins by 200bps through improved infrastructure efficiency. The company also announced three major enterprise client wins from AWS.",\n'
-                    '  "significance": "This acceleration in cloud growth is particularly significant as it reverses three quarters of gradual slowdown and demonstrates Microsoft\'s ability to win major enterprise contracts from AWS. The simultaneous margin expansion, despite aggressive pricing, indicates their infrastructure investments are paying off through improved efficiency. The 3% market share gain represents approximately $4B in annual recurring revenue, strengthening their position as a strong challenger to AWS. Looking ahead, this could signal a shift in enterprise cloud preferences, especially given Microsoft\'s stronger position in AI and enterprise software integration.",\n'
+                    '  "article_summary": "Apple reported Q4 iPhone revenue of $69.7B (+15% YoY), with particularly strong growth in China (+22% YoY) and India (+40% YoY). ASPs increased 7% to $931 driven by Pro model mix, while margins expanded 180bps to 42.1%. Management guided to double-digit growth continuing in Q1 on strong demand and easing supply constraints.",\n'
+                    '  "deep_analysis": "This quarter marks a decisive shift in Apple\'s growth trajectory and competitive positioning. The 15% iPhone revenue growth significantly outpaced expectations of 8-10%, with the mix shift toward Pro models (estimated 65% of units vs 58% last year) demonstrating Apple\'s pricing power and brand strength even in a challenging consumer environment.\n\nThe China performance is particularly noteworthy given macro concerns and Huawei\'s resurgence. The 22% growth suggests Apple\'s premium positioning and ecosystem strategy are resonating strongly, with management noting customer satisfaction scores reaching new highs. The 40% India growth, while off a smaller base, validates Apple\'s investment in local manufacturing and retail presence.\n\nMargin expansion of 180bps to 42.1% reflects both the favorable mix and improving supply chain efficiency. This level of profitability is unprecedented in consumer hardware and creates substantial resources for R&D investment in emerging areas like AR/VR and AI, where Apple\'s vertical integration could provide significant advantages.\n\nLooking forward, the strong Q1 guide suggests the 15 Pro/Pro Max supply constraints are easing while demand remains robust. The increasing Pro mix and growing services attachment rate (now 71% of active devices) points to sustained margin strength. Watch for expanding India manufacturing capacity and potential AI-driven features in iOS 18 as additional growth drivers.",\n'
                     '  "market_impact": "Very Positive",\n'
-                    '  "impact_explanation": "The combination of accelerating growth, margin expansion, and market share gains challenges the bear thesis that cloud growth was structurally slowing. The 200bps margin improvement suggests sustainable profit acceleration, while enterprise wins indicate strong competitive positioning. Expect positive estimate revisions and potential multiple expansion as the market prices in faster growth."\n'
+                    '  "trading_thesis": "The combination of accelerating growth, expanding margins, and strong emerging market performance justifies a positive re-rating of Apple\'s multiple. The Pro model mix shift suggests pricing power remains strong despite macro concerns, while India momentum adds a new growth vector. Key metrics to watch include Pro model lead times, China market share data, and iOS 18 features/adoption. Primary risk is high bar set for iPhone 16 cycle. Impact should be visible in sustained ASP growth starting next quarter, with full benefits to margin profile evident by mid-2024."\n'
                     "}\n\n"
-                    "Focus on specific business implications, quantitative metrics, and clear cause-effect relationships. Avoid general statements and provide concrete, actionable insights."
+                    "Your analysis should match this level of depth and specificity. Focus on connecting dots between news, business impact, and stock implications. Avoid generic statements - provide concrete insights an investor could act on."
                 )
 
                 response = requests.post(
@@ -134,13 +136,19 @@ class NewsAnalyzer:
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.7
                     },
-                    timeout=10
+                    timeout=30
                 )
 
                 if response.status_code == 200:
-                    return json.loads(response.json()['choices'][0]['message']['content'])
+                    # Rename fields to match frontend expectations
+                    analysis = json.loads(response.json()['choices'][0]['message']['content'])
+                    return {
+                        'article_summary': analysis['article_summary'],
+                        'significance': analysis['deep_analysis'],
+                        'market_impact': analysis['market_impact'],
+                        'impact_explanation': analysis['trading_thesis']
+                    }
 
-            # Fallback to simple analysis
             return self._simple_analysis(article['title'], article['description'])
 
         except Exception as e:
