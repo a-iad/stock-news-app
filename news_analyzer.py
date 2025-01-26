@@ -37,7 +37,7 @@ class NewsAnalyzer:
                 json={
                     "model": "deepseek-chat",
                     "prompt": prompt,
-                    "max_tokens": 150,
+                    "max_tokens": 600,  # Updated from 150 to 600
                     "temperature": 0.7
                 },
                 timeout=30,
