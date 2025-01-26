@@ -17,68 +17,56 @@ class NewsAnalyzer:
         if not self.deepseek_api_key:
             print("WARNING: DEEPSEEK_API_KEY not found in environment")
 
-    def fetch_relevant_news(self, symbol: str, company_name: str = None) -> Dict[str, Any]:
-        """Fetch and analyze news for a stock."""
+    def _call_deepseek_api(self, prompt: str) -> Dict[str, Any]:
+        """Make an API call to DeepSeek with detailed logging."""
         try:
-            print(f"\nFetching news for {symbol} ({company_name if company_name else 'no company name'})")
+            print("\nCalling DeepSeek API...")
+            print(f"API URL: {self.deepseek_url}")
 
-            # Prepare search query
-            query_parts = [f"({symbol} stock OR {company_name})" if company_name else symbol]
-            query = ' '.join(query_parts + ['AND (market OR earnings OR financial OR economy)'])
-            print(f"Search query: {query}")
-
-            params = {
-                'q': query,
-                'apiKey': self.news_api_key,
-                'language': 'en',
-                'sortBy': 'relevancy',
-                'pageSize': 10,
-                'from': (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            headers = {
+                "Authorization": f"Bearer {self.deepseek_api_key}",
+                "Content-Type": "application/json"
             }
 
-            # Fetch news articles
-            response = requests.get(self.news_api_url, params=params)
-            if response.status_code != 200:
-                print(f"News API error: Status {response.status_code}")
+            data = {
+                "model": "deepseek-chat",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7
+            }
+
+            print("Sending request to DeepSeek API...")
+            response = requests.post(
+                self.deepseek_url,
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+
+            print(f"DeepSeek API Response Status: {response.status_code}")
+
+            if response.status_code == 200:
+                result = response.json()
+                if 'choices' in result and len(result['choices']) > 0:
+                    content = result['choices'][0]['message']['content']
+                    print("Successfully received analysis from DeepSeek")
+                    return json.loads(content)
+                else:
+                    print("Error: Unexpected response format from DeepSeek")
+                    print(f"Response: {result}")
+            else:
+                print(f"Error: DeepSeek API returned status {response.status_code}")
                 print(f"Response: {response.text}")
-                return {'articles': []}
 
-            articles = response.json().get('articles', [])
-            if not articles:
-                print("No articles found")
-                return {'articles': []}
+            return None
 
-            print(f"Found {len(articles)} articles")
-
-            # Process individual articles
-            processed_articles = []
-            for i, article in enumerate(articles[:4]):
-                try:
-                    article_analysis = self._analyze_article(article, symbol, company_name)
-                    if article_analysis:
-                        processed_articles.append({
-                            'title': article['title'],
-                            'article_summary': article_analysis.get('article_summary', ''),
-                            'url': article['url'],
-                            'published_at': article['publishedAt'],
-                            'analysis': article_analysis
-                        })
-                        print(f"Processed article {i+1}")
-                except Exception as e:
-                    print(f"Error processing article {i+1}: {str(e)}")
-                    continue
-
-            result = {
-                'articles': processed_articles
-            }
-
-            print(f"Returning {len(processed_articles)} processed articles")
-            return result
-
+        except json.JSONDecodeError as e:
+            print(f"Error decoding DeepSeek response: {str(e)}")
+            print(f"Raw response: {response.text if 'response' in locals() else 'No response'}")
+            return None
         except Exception as e:
-            print(f"Error in fetch_relevant_news: {str(e)}")
+            print(f"Error calling DeepSeek API: {str(e)}")
             traceback.print_exc()
-            return {'articles': []}
+            return None
 
     def _analyze_article(self, article: Dict[str, Any], symbol: str, company_name: str) -> Dict[str, Any]:
         """Deep analysis of individual articles using DeepSeek AI."""
@@ -125,23 +113,8 @@ class NewsAnalyzer:
                     "Your analysis should match this level of depth and specificity. Focus on connecting dots between news, business impact, and stock implications. Avoid generic statements - provide concrete insights an investor could act on."
                 )
 
-                response = requests.post(
-                    self.deepseek_url,
-                    headers={
-                        "Authorization": f"Bearer {self.deepseek_api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "deepseek-chat",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.7
-                    },
-                    timeout=30
-                )
-
-                if response.status_code == 200:
-                    # Rename fields to match frontend expectations
-                    analysis = json.loads(response.json()['choices'][0]['message']['content'])
+                analysis = self._call_deepseek_api(prompt)
+                if analysis:
                     return {
                         'article_summary': analysis['article_summary'],
                         'significance': analysis['deep_analysis'],
@@ -149,6 +122,7 @@ class NewsAnalyzer:
                         'impact_explanation': analysis['trading_thesis']
                     }
 
+            print("Falling back to simple analysis")
             return self._simple_analysis(article['title'], article['description'])
 
         except Exception as e:
@@ -215,3 +189,66 @@ class NewsAnalyzer:
                 'market_impact': "Ambivalent",
                 'impact_explanation': "Insufficient information for detailed analysis"
             }
+
+    def fetch_relevant_news(self, symbol: str, company_name: str = None) -> Dict[str, Any]:
+        """Fetch and analyze news for a stock."""
+        try:
+            print(f"\nFetching news for {symbol} ({company_name if company_name else 'no company name'})")
+
+            # Prepare search query
+            query_parts = [f"({symbol} stock OR {company_name})" if company_name else symbol]
+            query = ' '.join(query_parts + ['AND (market OR earnings OR financial OR economy)'])
+            print(f"Search query: {query}")
+
+            params = {
+                'q': query,
+                'apiKey': self.news_api_key,
+                'language': 'en',
+                'sortBy': 'relevancy',
+                'pageSize': 10,
+                'from': (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            }
+
+            # Fetch news articles
+            response = requests.get(self.news_api_url, params=params)
+            if response.status_code != 200:
+                print(f"News API error: Status {response.status_code}")
+                print(f"Response: {response.text}")
+                return {'articles': []}
+
+            articles = response.json().get('articles', [])
+            if not articles:
+                print("No articles found")
+                return {'articles': []}
+
+            print(f"Found {len(articles)} articles")
+
+            # Process individual articles
+            processed_articles = []
+            for i, article in enumerate(articles[:4]):
+                try:
+                    article_analysis = self._analyze_article(article, symbol, company_name)
+                    if article_analysis:
+                        processed_articles.append({
+                            'title': article['title'],
+                            'article_summary': article_analysis.get('article_summary', ''),
+                            'url': article['url'],
+                            'published_at': article['publishedAt'],
+                            'analysis': article_analysis
+                        })
+                        print(f"Processed article {i+1}")
+                except Exception as e:
+                    print(f"Error processing article {i+1}: {str(e)}")
+                    continue
+
+            result = {
+                'articles': processed_articles
+            }
+
+            print(f"Returning {len(processed_articles)} processed articles")
+            return result
+
+        except Exception as e:
+            print(f"Error in fetch_relevant_news: {str(e)}")
+            traceback.print_exc()
+            return {'articles': []}
