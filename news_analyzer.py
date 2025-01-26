@@ -20,7 +20,7 @@ class NewsAnalyzer:
     def _call_deepseek_api(self, prompt: str) -> Dict[str, Any]:
         """Make API call to DeepSeek."""
         try:
-            print(f"\nSending to DeepSeek API: {prompt[:100]}...")  # Log start of prompt
+            print(f"\nSending to DeepSeek API: {prompt[:100]}...")
 
             if not self.deepseek_api_key:
                 print("ERROR: No DeepSeek API key found")
@@ -31,13 +31,13 @@ class NewsAnalyzer:
                 "Content-Type": "application/json"
             }
 
-            # Use HTTPS and verify the connection
             response = requests.post(
-                "https://api.deepseek.com/v1/completions",  # Updated endpoint
+                "https://api.deepseek.com/v1/chat/completions",
                 headers=headers,
                 json={
                     "model": "deepseek-chat",
-                    "messages": [{"role": "user", "content": prompt}],
+                    "prompt": prompt,
+                    "max_tokens": 150,
                     "temperature": 0.7
                 },
                 timeout=30,
@@ -48,7 +48,7 @@ class NewsAnalyzer:
             if response.status_code == 200:
                 result = response.json()
                 print("Got DeepSeek response")
-                return result['choices'][0]['message']['content']
+                return result['choices'][0]['text']
             elif response.status_code == 401:
                 print("DeepSeek API authentication failed - invalid API key")
                 return None
