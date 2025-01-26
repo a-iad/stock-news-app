@@ -61,37 +61,25 @@ class NewsAnalyzer:
 
         try:
             if self.deepseek_api_key:
-                # Super simple prompt focusing just on stock impact
                 prompt = (
-                    f"News about {symbol}:\n\n"
-                    f"{article['title']}\n"
-                    f"{article['description']}\n\n"
-                    "Summarize the news and explain how this could move the stock price and why. "
-                    "Focus on specific business impacts and metrics."
+                    f"Article: {article['title']}\n{article['description']}\n\n"
+                    "Summarize article and analyze with up to a paragraph explaining potential impact on stock price. "
+                    "Focus on specific business metrics and market expectations."
                 )
 
                 result = self._call_deepseek_api(prompt)
                 if result:
-                    # Split response into summary and analysis
-                    parts = result.split("\n\n", 1)
-                    if len(parts) == 2:
-                        summary, analysis = parts
-                    else:
-                        summary = parts[0]
-                        analysis = "Impact analysis not available"
-
                     return {
-                        'article_summary': summary,
-                        'significance': analysis,
-                        'market_impact': 'Somewhat Positive',  # Simplified for now
-                        'impact_explanation': analysis
+                        'article_summary': article['title'],
+                        'significance': result,
+                        'market_impact': 'Positive' if 'increase' in result.lower() or 'growth' in result.lower() else 'Negative',
+                        'impact_explanation': result
                     }
 
             return self._simple_analysis(article['title'], article['description'])
 
         except Exception as e:
             print(f"Article analysis failed: {str(e)}")
-            traceback.print_exc()
             return self._simple_analysis(article['title'], article['description'])
 
     def _simple_analysis(self, title: str, description: str) -> Dict[str, Any]:
