@@ -18,82 +18,75 @@ class NewsAnalyzer:
             print("WARNING: DEEPSEEK_API_KEY not found in environment")
 
     def _call_deepseek_api(self, prompt: str) -> Dict[str, Any]:
-        """Make an API call to DeepSeek with detailed logging."""
+        """Make API call to DeepSeek."""
         try:
-            print(f"\nMaking DeepSeek API call...")
+            print(f"\nSending to DeepSeek API: {prompt[:100]}...")  # Log start of prompt
 
             if not self.deepseek_api_key:
                 print("ERROR: No DeepSeek API key found")
                 return None
 
-            headers = {
-                "Authorization": f"Bearer {self.deepseek_api_key}",
-                "Content-Type": "application/json"
-            }
-
-            data = {
-                "model": "deepseek-chat",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 1000
-            }
-
             response = requests.post(
                 self.deepseek_url,
-                headers=headers,
-                json=data,
+                headers={
+                    "Authorization": f"Bearer {self.deepseek_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "deepseek-chat",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.7
+                },
                 timeout=30
             )
 
-            if response.status_code != 200:
-                print(f"DeepSeek API Error {response.status_code}: {response.text}")
-                return None
+            print(f"DeepSeek response status: {response.status_code}")
+            if response.status_code == 200:
+                result = response.json()
+                print("Got DeepSeek response")
+                return result['choices'][0]['message']['content']
 
-            result = response.json()
-            if not result.get('choices'):
-                print("No choices in DeepSeek response")
-                return None
-
-            return json.loads(result['choices'][0]['message']['content'])
+            print(f"DeepSeek API error: {response.text}")
+            return None
 
         except Exception as e:
-            print(f"DeepSeek API call failed: {str(e)}")
+            print(f"DeepSeek API error: {str(e)}")
             traceback.print_exc()
             return None
 
     def _analyze_article(self, article: Dict[str, Any], symbol: str, company_name: str) -> Dict[str, Any]:
-        """Get focused stock impact analysis from DeepSeek."""
+        """Get stock impact analysis from DeepSeek."""
         if not article.get('title') or not article.get('description'):
             return None
 
         try:
             if self.deepseek_api_key:
+                # Super simple prompt focusing just on stock impact
                 prompt = (
-                    f"You are a Wall Street analyst. For this news about {symbol}:\n\n"
-                    f"TITLE: {article['title']}\n"
-                    f"CONTENT: {article['description']}\n\n"
-                    "Provide:\n"
-                    "1. A clear summary of the news and key facts\n"
-                    "2. Analysis of potential stock price impact. Focus on specific reasons why this matters for the stock price "
-                    "including business metrics, competitive position, and market expectations.\n\n"
-                    "Format as JSON:\n"
-                    "{\n"
-                    '  "summary": "clear summary of the news",\n'
-                    '  "stock_impact": "detailed paragraph on why this matters for the stock price and what metrics to watch"\n'
-                    "}"
+                    f"News about {symbol}:\n\n"
+                    f"{article['title']}\n"
+                    f"{article['description']}\n\n"
+                    "Summarize the news and explain how this could move the stock price and why. "
+                    "Focus on specific business impacts and metrics."
                 )
 
                 result = self._call_deepseek_api(prompt)
                 if result:
-                    # Transform the response into our existing frontend format
+                    # Split response into summary and analysis
+                    parts = result.split("\n\n", 1)
+                    if len(parts) == 2:
+                        summary, analysis = parts
+                    else:
+                        summary = parts[0]
+                        analysis = "Impact analysis not available"
+
                     return {
-                        'article_summary': result['summary'],
-                        'significance': result['stock_impact'],
-                        'market_impact': 'Somewhat Positive',  # We'll derive this from the content later
-                        'impact_explanation': result['stock_impact']
+                        'article_summary': summary,
+                        'significance': analysis,
+                        'market_impact': 'Somewhat Positive',  # Simplified for now
+                        'impact_explanation': analysis
                     }
 
-            print("Falling back to simple analysis")
             return self._simple_analysis(article['title'], article['description'])
 
         except Exception as e:
