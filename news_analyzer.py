@@ -78,8 +78,11 @@ class NewsAnalyzer:
             if self.deepseek_api_key:
                 prompt = (
                     f"Article: {article['title']}\n{article['description']}\n\n"
-                    "Analyze this article and explain its potential market impact. "
-                    "Focus on business metrics, market expectations, and specific implications for stock performance."
+                    "Analyze this article and provide:\n"
+                    "1. A detailed explanation of its potential market impact\n"
+                    "2. Key business metrics and market expectations affected\n"
+                    "3. Specific implications for stock performance\n\n"
+                    "Provide a thorough analysis with clear reasoning."
                 )
 
                 analysis = self._call_deepseek_api(prompt)
