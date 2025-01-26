@@ -88,30 +88,39 @@ class NewsAnalyzer:
         try:
             if self.deepseek_api_key:
                 prompt = (
-                    f"As a financial analyst, analyze this news about {symbol} ({company_name if company_name else 'unknown company'}):\n"
+                    f"As an expert financial analyst, provide a comprehensive analysis of this news about {symbol} ({company_name if company_name else 'unknown company'}):\n"
                     f"Title: {article['title']}\n"
                     f"Content: {article['description']}\n\n"
                     "Provide a detailed analysis in JSON format with these components:\n\n"
-                    "1. article_summary: A concise 2-3 sentence summary of the key points in the article\n\n"
-                    "2. significance: A detailed 2-3 sentence explanation of why this news matters for investors. "
-                    "Focus on specific business implications, market dynamics, or competitive advantages. "
-                    "Include concrete details like numbers, market position changes, or strategic implications. "
-                    "Avoid generic statements.\n\n"
-                    "3. market_impact: One of these values based on likely effect on stock value:\n"
-                    "   - 'Very Positive': Strong upward pressure expected\n"
-                    "   - 'Somewhat Positive': Moderate upward influence likely\n"
-                    "   - 'Ambivalent': Mixed or unclear implications\n"
-                    "   - 'Somewhat Negative': Moderate downward pressure possible\n"
-                    "   - 'Very Negative': Significant downward pressure expected\n\n"
-                    "4. impact_explanation: A specific explanation of why you chose this impact level\n\n"
+                    "1. article_summary: A detailed yet concise summary focusing on key business implications and market impact. "
+                    "Highlight specific numbers, business metrics, or strategic changes mentioned. "
+                    "3-4 sentences maximum.\n\n"
+                    "2. significance: A thorough analysis (4-6 sentences) that explains:\n"
+                    "   - Direct business impact on revenue, margins, or market share\n"
+                    "   - Strategic implications for competitive position\n"
+                    "   - Effect on growth trajectory or business model\n"
+                    "   - Connection to broader market trends or industry shifts\n"
+                    "   - Long-term implications for the company's strategic position\n"
+                    "Include specific metrics, competitor comparisons, and market context where relevant.\n\n"
+                    "3. market_impact: One of these values based on comprehensive analysis:\n"
+                    "   - 'Very Positive': Strong upward pressure with clear long-term benefits\n"
+                    "   - 'Somewhat Positive': Moderate upward influence with some uncertainties\n"
+                    "   - 'Ambivalent': Mixed implications or unclear long-term impact\n"
+                    "   - 'Somewhat Negative': Moderate concerns with potential mitigating factors\n"
+                    "   - 'Very Negative': Significant challenges with lasting implications\n\n"
+                    "4. impact_explanation: A detailed explanation connecting the news to likely stock movement, including:\n"
+                    "   - Effect on key business metrics\n"
+                    "   - Comparison to market expectations\n"
+                    "   - Potential investor reaction\n"
+                    "   - Timeline for impact\n\n"
                     "Example format:\n"
                     "{\n"
-                    '  "article_summary": "Microsoft reported Q4 cloud revenue growth of 30% YoY, reaching $25B. Azure gained 3% market share against AWS, while operating margins improved by 200 basis points.",\n'
-                    '  "significance": "The accelerating cloud growth rate reverses 3 quarters of slowdown and suggests Microsoft is winning large enterprise contracts from AWS. The margin improvement indicates successful cost optimization despite aggressive pricing, strengthening their competitive position.",\n'
+                    '  "article_summary": "Microsoft reported exceptional Q4 cloud revenue growth of 30% YoY to $25B, significantly outpacing market expectations of 25%. Azure gained 3% market share against AWS while expanding operating margins by 200bps through improved infrastructure efficiency. The company also announced three major enterprise client wins from AWS.",\n'
+                    '  "significance": "This acceleration in cloud growth is particularly significant as it reverses three quarters of gradual slowdown and demonstrates Microsoft\'s ability to win major enterprise contracts from AWS. The simultaneous margin expansion, despite aggressive pricing, indicates their infrastructure investments are paying off through improved efficiency. The 3% market share gain represents approximately $4B in annual recurring revenue, strengthening their position as a strong challenger to AWS. Looking ahead, this could signal a shift in enterprise cloud preferences, especially given Microsoft\'s stronger position in AI and enterprise software integration.",\n'
                     '  "market_impact": "Very Positive",\n'
-                    '  "impact_explanation": "Faster growth in their highest-margin segment combined with overall margin expansion points to sustainable profit acceleration."\n'
+                    '  "impact_explanation": "The combination of accelerating growth, margin expansion, and market share gains challenges the bear thesis that cloud growth was structurally slowing. The 200bps margin improvement suggests sustainable profit acceleration, while enterprise wins indicate strong competitive positioning. Expect positive estimate revisions and potential multiple expansion as the market prices in faster growth."\n'
                     "}\n\n"
-                    "Ensure all analysis is specific, detailed, and backed by information from the article."
+                    "Focus on specific business implications, quantitative metrics, and clear cause-effect relationships. Avoid general statements and provide concrete, actionable insights."
                 )
 
                 response = requests.post(
