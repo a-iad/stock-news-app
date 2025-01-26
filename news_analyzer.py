@@ -41,37 +41,24 @@ class NewsAnalyzer:
             if response.status_code != 200:
                 print(f"News API error: Status {response.status_code}")
                 print(f"Response: {response.text}")
-                return {'summary_analysis': None, 'articles': []}
+                return {'articles': []}
 
             articles = response.json().get('articles', [])
             if not articles:
                 print("No articles found")
-                return {'summary_analysis': None, 'articles': []}
+                return {'articles': []}
 
             print(f"Found {len(articles)} articles")
-
-            # Generate summary analysis if possible
-            summary_analysis = None
-            if self.deepseek_api_key and articles:
-                try:
-                    summary_analysis = self._generate_summary(symbol, articles[:3])
-                    if summary_analysis:
-                        print("Successfully generated summary analysis")
-                    else:
-                        print("Failed to generate summary analysis")
-                except Exception as e:
-                    print(f"Error in summary generation: {str(e)}")
-                    traceback.print_exc()
 
             # Process individual articles
             processed_articles = []
             for i, article in enumerate(articles[:4]):
                 try:
-                    article_analysis = self._analyze_article(article, symbol)
+                    article_analysis = self._analyze_article(article, symbol, company_name)
                     if article_analysis:
                         processed_articles.append({
                             'title': article['title'],
-                            'summary': article['description'],
+                            'article_summary': article_analysis.get('article_summary', ''),
                             'url': article['url'],
                             'published_at': article['publishedAt'],
                             'analysis': article_analysis
@@ -82,84 +69,49 @@ class NewsAnalyzer:
                     continue
 
             result = {
-                'summary_analysis': summary_analysis,
                 'articles': processed_articles
             }
 
             print(f"Returning {len(processed_articles)} processed articles")
-            if summary_analysis:
-                print("Including summary analysis")
-
             return result
 
         except Exception as e:
             print(f"Error in fetch_relevant_news: {str(e)}")
             traceback.print_exc()
-            return {'summary_analysis': None, 'articles': []}
+            return {'articles': []}
 
-    def _generate_summary(self, symbol: str, articles: list) -> Dict[str, Any]:
-        """Generate summary analysis for articles."""
-        try:
-            summary_prompt = (
-                f"Analyze these recent news articles about {symbol}:\n"
-                + "\n".join([f"Article {i+1}:\nTitle: {a['title']}\nSummary: {a['description']}"
-                            for i, a in enumerate(articles)])
-                + "\n\nProvide exactly 3 main points that matter most for investors, considering:"
-                + "\n1. Direct stock impact & market reaction"
-                + "\n2. Historical context or similar past events"
-                + "\n3. Broader implications for the sector/market"
-                + "\n\nFormat: JSON with structure:"
-                + '{\n    "key_points": [\n        {"point": "Main insight", "impact": "Detailed explanation"}\n    ]\n}'
-            )
-
-            response = requests.post(
-                self.deepseek_url,
-                headers={
-                    "Authorization": f"Bearer {self.deepseek_api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek-chat",
-                    "messages": [{"role": "user", "content": summary_prompt}],
-                    "temperature": 0.7
-                },
-                timeout=10
-            )
-
-            if response.status_code == 200:
-                return json.loads(response.json()['choices'][0]['message']['content'])
-            print(f"DeepSeek API error: {response.status_code}")
-            return None
-
-        except Exception as e:
-            print(f"Error in summary generation: {str(e)}")
-            return None
-
-    def _analyze_article(self, article: Dict[str, Any], symbol: str) -> Dict[str, Any]:
+    def _analyze_article(self, article: Dict[str, Any], symbol: str, company_name: str) -> Dict[str, Any]:
         """Analyze individual article for relevance and impact."""
         if not article.get('title') or not article.get('description'):
             return None
 
         try:
-            # Always try DeepSeek analysis first
             if self.deepseek_api_key:
                 prompt = (
-                    f"As a financial analyst, analyze this news about {symbol} stock. Be concise and focused on business impact:\n"
+                    f"As a financial analyst, analyze this news about {symbol} ({company_name if company_name else 'unknown company'}):\n"
                     f"Title: {article['title']}\n"
                     f"Content: {article['description']}\n\n"
-                    "Format response as JSON with these fields:\n"
-                    "1. relevance_summary: A 1-2 sentence explanation of how this directly affects the company's business/stock\n"
-                    "2. potential_impact: One of ['Positive', 'Negative', 'Neutral'] based on likely stock price effect\n"
-                    "3. impact_reason: A brief explanation of why you chose this impact direction\n"
-                    "4. confidence: A number 0-100 indicating analysis confidence\n\n"
+                    "Provide a detailed analysis in JSON format with these components:\n\n"
+                    "1. article_summary: A concise 2-3 sentence summary of the key points in the article\n\n"
+                    "2. significance: A detailed 2-3 sentence explanation of why this news matters for investors. "
+                    "Focus on specific business implications, market dynamics, or competitive advantages. "
+                    "Include concrete details like numbers, market position changes, or strategic implications. "
+                    "Avoid generic statements.\n\n"
+                    "3. market_impact: One of these values based on likely effect on stock value:\n"
+                    "   - 'Very Positive': Strong upward pressure expected\n"
+                    "   - 'Somewhat Positive': Moderate upward influence likely\n"
+                    "   - 'Ambivalent': Mixed or unclear implications\n"
+                    "   - 'Somewhat Negative': Moderate downward pressure possible\n"
+                    "   - 'Very Negative': Significant downward pressure expected\n\n"
+                    "4. impact_explanation: A specific explanation of why you chose this impact level\n\n"
                     "Example format:\n"
                     "{\n"
-                    '  "relevance_summary": "Microsoft\'s cloud revenue grew 30% YoY, showing strong enterprise adoption and market share gains against AWS",\n'
-                    '  "potential_impact": "Positive",\n'
-                    '  "impact_reason": "Accelerating cloud growth signals expanding margins and recurring revenue",\n'
-                    '  "confidence": 85\n'
+                    '  "article_summary": "Microsoft reported Q4 cloud revenue growth of 30% YoY, reaching $25B. Azure gained 3% market share against AWS, while operating margins improved by 200 basis points.",\n'
+                    '  "significance": "The accelerating cloud growth rate reverses 3 quarters of slowdown and suggests Microsoft is winning large enterprise contracts from AWS. The margin improvement indicates successful cost optimization despite aggressive pricing, strengthening their competitive position.",\n'
+                    '  "market_impact": "Very Positive",\n'
+                    '  "impact_explanation": "Faster growth in their highest-margin segment combined with overall margin expansion points to sustainable profit acceleration."\n'
                     "}\n\n"
-                    "Focus on specific business metrics, competitive position, or market opportunities. Avoid generic statements."
+                    "Ensure all analysis is specific, detailed, and backed by information from the article."
                 )
 
                 response = requests.post(
@@ -179,7 +131,7 @@ class NewsAnalyzer:
                 if response.status_code == 200:
                     return json.loads(response.json()['choices'][0]['message']['content'])
 
-            # Fallback to enhanced simple analysis
+            # Fallback to simple analysis
             return self._simple_analysis(article['title'], article['description'])
 
         except Exception as e:
@@ -188,57 +140,61 @@ class NewsAnalyzer:
 
     def _simple_analysis(self, title: str, description: str) -> Dict[str, Any]:
         """Enhanced fallback simple analysis."""
-        text = (title + ' ' + description).lower()
+        try:
+            # Extract key information
+            combined_text = f"{title}. {description}"
 
-        # Define key business metrics and their associated terms
-        metrics = {
-            'revenue': ['revenue', 'sales', 'earnings', 'profit'],
-            'market_share': ['market share', 'market position', 'market leader'],
-            'product': ['launch', 'release', 'new product', 'innovation'],
-            'competition': ['competitor', 'competition', 'market leader'],
-            'costs': ['cost', 'expense', 'margin', 'efficiency']
-        }
+            # Generate a basic summary (first sentence of title + key details from description)
+            summary_sentences = []
+            if title:
+                summary_sentences.append(title.split('.')[0])
+            if description:
+                desc_sentences = description.split('.')
+                if len(desc_sentences) > 1:
+                    summary_sentences.append(desc_sentences[1].strip())
 
-        # Find the most relevant business aspect
-        found_metrics = []
-        for metric, terms in metrics.items():
-            if any(term in text for term in terms):
-                found_metrics.append(metric)
+            article_summary = '. '.join(summary_sentences)
 
-        # Generate a specific summary based on found metrics
-        if found_metrics:
-            primary_metric = found_metrics[0]
-            summary_templates = {
-                'revenue': "News discusses company's financial performance and revenue trends",
-                'market_share': "Article covers changes in company's market position and competitive standing",
-                'product': "Updates on product developments and potential market reception",
-                'competition': "News about competitive dynamics and market positioning",
-                'costs': "Information about company's cost structure and operational efficiency"
+            # Analyze impact based on key phrases
+            impact_phrases = {
+                'Very Positive': ['surge', 'breakthrough', 'exceeds expectations', 'record high'],
+                'Somewhat Positive': ['increase', 'growth', 'improvement', 'gains'],
+                'Somewhat Negative': ['decline', 'below expectations', 'challenges'],
+                'Very Negative': ['plunge', 'crisis', 'major setback', 'significant loss']
             }
-            relevance_summary = summary_templates.get(primary_metric, "General business update with potential stock impact")
-        else:
-            relevance_summary = "General market news that may affect trading sentiment"
 
-        # Analyze sentiment for impact direction
-        positive_terms = ['growth', 'increase', 'beat', 'exceed', 'gain', 'success', 'improve']
-        negative_terms = ['decline', 'drop', 'miss', 'below', 'risk', 'concern', 'problem']
+            # Determine impact level
+            impact_scores = {level: 0 for level in impact_phrases.keys()}
+            text_lower = combined_text.lower()
 
-        positive_count = sum(1 for term in positive_terms if term in text)
-        negative_count = sum(1 for term in negative_terms if term in text)
+            for level, phrases in impact_phrases.items():
+                for phrase in phrases:
+                    if phrase.lower() in text_lower:
+                        impact_scores[level] += 1
 
-        if positive_count > negative_count:
-            impact = "Positive"
-            impact_reason = "News contains mostly positive business indicators"
-        elif negative_count > positive_count:
-            impact = "Negative"
-            impact_reason = "News highlights potential business challenges"
-        else:
-            impact = "Neutral"
-            impact_reason = "Mixed or unclear business implications"
+            # Select impact level
+            if max(impact_scores.values()) == 0:
+                market_impact = "Ambivalent"
+                impact_explanation = "News has mixed or unclear implications for the company's performance"
+            else:
+                market_impact = max(impact_scores.items(), key=lambda x: x[1])[0]
+                impact_explanation = f"Multiple indicators suggest {market_impact.lower()} impact on company value"
 
-        return {
-            'relevance_summary': relevance_summary,
-            'potential_impact': impact,
-            'impact_reason': impact_reason,
-            'confidence': 60
-        }
+            # Generate significance explanation
+            significance = f"This news potentially affects the company's market position and business operations. {impact_explanation}."
+
+            return {
+                'article_summary': article_summary,
+                'significance': significance,
+                'market_impact': market_impact,
+                'impact_explanation': impact_explanation
+            }
+
+        except Exception as e:
+            print(f"Error in simple analysis: {str(e)}")
+            return {
+                'article_summary': title,
+                'significance': "Unable to analyze specific impact",
+                'market_impact': "Ambivalent",
+                'impact_explanation': "Insufficient information for detailed analysis"
+            }

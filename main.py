@@ -123,37 +123,49 @@ if not st.session_state.portfolio.holdings.empty:
                             col_content, col_analysis = st.columns([2, 1])
 
                             with col_content:
-                                # Summary
-                                st.write(article['summary'])
+                                # Article Summary
+                                if article.get('article_summary'):
+                                    st.markdown("""
+                                    <div style='margin-bottom: 15px;'>
+                                        <strong>Summary:</strong><br>
+                                        {}
+                                    </div>
+                                    """.format(article['article_summary']), unsafe_allow_html=True)
 
                                 # Why it matters section
-                                if article.get('analysis', {}).get('relevance_summary'):
+                                if article.get('analysis', {}).get('significance'):
                                     st.markdown("""
                                     <div style='margin-top: 10px; padding: 10px; background-color: #f0f2f6; border-radius: 5px;'>
                                         <strong>Why It Matters:</strong><br>
                                         {}
                                     </div>
-                                    """.format(article['analysis']['relevance_summary']), unsafe_allow_html=True)
+                                    """.format(article['analysis']['significance']), unsafe_allow_html=True)
 
                             with col_analysis:
                                 # Impact analysis
                                 analysis = article.get('analysis', {})
-                                impact = analysis.get('potential_impact', 'Neutral')
-                                impact_color = (
-                                    "#2e7d32" if impact == "Positive"
-                                    else "#c62828" if impact == "Negative"
-                                    else "#666666"
-                                )
+                                impact = analysis.get('market_impact', 'Ambivalent')
+
+                                # Define color scheme for different impact levels
+                                impact_colors = {
+                                    'Very Positive': '#1b5e20',  # Dark green
+                                    'Somewhat Positive': '#2e7d32',  # Medium green
+                                    'Ambivalent': '#666666',  # Gray
+                                    'Somewhat Negative': '#c62828',  # Medium red
+                                    'Very Negative': '#b71c1c'  # Dark red
+                                }
+
+                                impact_color = impact_colors.get(impact, '#666666')
 
                                 st.markdown(f"""
                                 <div style='padding: 10px; border: 1px solid {impact_color}; border-radius: 5px;'>
-                                    <p><strong>Impact:</strong> {impact}</p>
-                                    <p><em>{analysis.get('impact_reason', '')}</em></p>
-                                    <p><strong>Confidence:</strong> {analysis.get('confidence', 50)}%</p>
+                                    <p style='color: {impact_color};'><strong>Market Impact:</strong> {impact}</p>
+                                    <p><em>{analysis.get('impact_explanation', '')}</em></p>
                                 </div>
                                 """, unsafe_allow_html=True)
 
                             st.caption(f"Published: {article.get('published_at', 'N/A')}")
+
                     else:
                         st.info("No recent news available for this stock.")
 
