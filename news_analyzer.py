@@ -144,16 +144,22 @@ class NewsAnalyzer:
             # Always try DeepSeek analysis first
             if self.deepseek_api_key:
                 prompt = (
-                    f"Analyze this news article about {symbol} stock:\n"
+                    f"As a financial analyst, analyze this news about {symbol} stock. Be concise and focused on business impact:\n"
                     f"Title: {article['title']}\n"
                     f"Content: {article['description']}\n\n"
-                    "Provide analysis in this format:\n"
-                    "1. Market relevance: Explain specifically how this news affects the stock's business, operations, or market position\n"
-                    "2. Potential impact: Analyze if this is positive/negative/neutral for the stock price and explain why\n"
-                    "3. Confidence: Rate 0-100 how confident you are in this analysis\n"
-                    "4. Historical context: Mention any similar past events or patterns\n\n"
-                    "Be specific about the connection between the news and the stock. Focus on direct business implications.\n\n"
-                    "Format: JSON with keys 'market_relevance', 'potential_impact', 'confidence', 'historical_context'"
+                    "Format response as JSON with these fields:\n"
+                    "1. relevance_summary: A 1-2 sentence explanation of how this directly affects the company's business/stock\n"
+                    "2. potential_impact: One of ['Positive', 'Negative', 'Neutral'] based on likely stock price effect\n"
+                    "3. impact_reason: A brief explanation of why you chose this impact direction\n"
+                    "4. confidence: A number 0-100 indicating analysis confidence\n\n"
+                    "Example format:\n"
+                    "{\n"
+                    '  "relevance_summary": "Microsoft\'s cloud revenue grew 30% YoY, showing strong enterprise adoption and market share gains against AWS",\n'
+                    '  "potential_impact": "Positive",\n'
+                    '  "impact_reason": "Accelerating cloud growth signals expanding margins and recurring revenue",\n'
+                    '  "confidence": 85\n'
+                    "}\n\n"
+                    "Focus on specific business metrics, competitive position, or market opportunities. Avoid generic statements."
                 )
 
                 response = requests.post(
@@ -181,64 +187,58 @@ class NewsAnalyzer:
             return self._simple_analysis(article['title'], article['description'])
 
     def _simple_analysis(self, title: str, description: str) -> Dict[str, Any]:
-        """Enhanced fallback simple analysis when DeepSeek is unavailable."""
+        """Enhanced fallback simple analysis."""
         text = (title + ' ' + description).lower()
 
-        # Enhanced keyword analysis
-        business_terms = {
-            'revenue': ['revenue', 'sales', 'earnings'],
-            'operations': ['production', 'operations', 'expansion'],
-            'market': ['market share', 'competition', 'industry'],
-            'product': ['product', 'service', 'launch'],
-            'financial': ['profit', 'margin', 'cost']
+        # Define key business metrics and their associated terms
+        metrics = {
+            'revenue': ['revenue', 'sales', 'earnings', 'profit'],
+            'market_share': ['market share', 'market position', 'market leader'],
+            'product': ['launch', 'release', 'new product', 'innovation'],
+            'competition': ['competitor', 'competition', 'market leader'],
+            'costs': ['cost', 'expense', 'margin', 'efficiency']
         }
 
-        impact_terms = {
-            'positive': ['surge', 'gain', 'rise', 'growth', 'profit', 'success', 'beat', 'exceed'],
-            'negative': ['fall', 'drop', 'decline', 'loss', 'risk', 'down', 'miss', 'below']
-        }
-
-        # Analyze business aspects
-        business_aspects = []
-        for aspect, terms in business_terms.items():
+        # Find the most relevant business aspect
+        found_metrics = []
+        for metric, terms in metrics.items():
             if any(term in text for term in terms):
-                business_aspects.append(aspect)
+                found_metrics.append(metric)
 
-        # Analyze sentiment
-        sentiment = {'positive': 0, 'negative': 0}
-        for impact, terms in impact_terms.items():
-            sentiment[impact] = sum(1 for term in terms if term in text)
-
-        # Generate relevance explanation
-        if business_aspects:
-            relevance = f"News impacts company's {', '.join(business_aspects)}"
-        else:
-            relevance = "General market news that may affect the stock price"
-
-        # Determine impact
-        total = sum(sentiment.values())
-        if total == 0:
-            return {
-                'market_relevance': relevance,
-                'potential_impact': 'Neutral',
-                'confidence': 50,
-                'historical_context': None
+        # Generate a specific summary based on found metrics
+        if found_metrics:
+            primary_metric = found_metrics[0]
+            summary_templates = {
+                'revenue': "News discusses company's financial performance and revenue trends",
+                'market_share': "Article covers changes in company's market position and competitive standing",
+                'product': "Updates on product developments and potential market reception",
+                'competition': "News about competitive dynamics and market positioning",
+                'costs': "Information about company's cost structure and operational efficiency"
             }
-
-        ratio = sentiment['positive'] / total if total > 0 else 0.5
-        if ratio > 0.6:
-            impact = 'Positive'
-            confidence = 70
-        elif ratio < 0.4:
-            impact = 'Negative'
-            confidence = 70
+            relevance_summary = summary_templates.get(primary_metric, "General business update with potential stock impact")
         else:
-            impact = 'Neutral'
-            confidence = 60
+            relevance_summary = "General market news that may affect trading sentiment"
+
+        # Analyze sentiment for impact direction
+        positive_terms = ['growth', 'increase', 'beat', 'exceed', 'gain', 'success', 'improve']
+        negative_terms = ['decline', 'drop', 'miss', 'below', 'risk', 'concern', 'problem']
+
+        positive_count = sum(1 for term in positive_terms if term in text)
+        negative_count = sum(1 for term in negative_terms if term in text)
+
+        if positive_count > negative_count:
+            impact = "Positive"
+            impact_reason = "News contains mostly positive business indicators"
+        elif negative_count > positive_count:
+            impact = "Negative"
+            impact_reason = "News highlights potential business challenges"
+        else:
+            impact = "Neutral"
+            impact_reason = "Mixed or unclear business implications"
 
         return {
-            'market_relevance': relevance,
+            'relevance_summary': relevance_summary,
             'potential_impact': impact,
-            'confidence': confidence,
-            'historical_context': None
+            'impact_reason': impact_reason,
+            'confidence': 60
         }
