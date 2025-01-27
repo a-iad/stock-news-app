@@ -57,14 +57,17 @@ class MarketData:
     def get_stock_data(symbol, period='1mo'):
         """Fetch stock data from Yahoo Finance."""
         try:
+            print(f"\nFetching stock data for {symbol} ({period})")  # Debug print
             ticker = yf.Ticker(symbol)
             data = ticker.history(period=period)
             if data.empty:
                 print(f"No data found for symbol: {symbol}")
                 return pd.DataFrame()
+            print(f"Successfully fetched {len(data)} data points for {symbol}")  # Debug print
             return data
         except Exception as e:
             print(f"Error fetching data for {symbol}: {str(e)}")
+            traceback.print_exc()  # Add stack trace
             return pd.DataFrame()
 
     def get_stock_prediction(self, symbol):

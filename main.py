@@ -6,12 +6,12 @@ from market_data import MarketData
 from portfolio import Portfolio
 from alerts import AlertSystem
 
-# Page configuration
-st.set_page_config(page_title="Market Intelligence Dashboard", layout="wide")
-
 # Initialize components
 print("Initializing application components...")
 market_data = MarketData()
+
+# Page configuration
+st.set_page_config(page_title="Market Intelligence Dashboard", layout="wide")
 
 # Initialize session state
 if 'portfolio' not in st.session_state:
@@ -50,7 +50,9 @@ if st.session_state.show_add_position:
                             if st.session_state.portfolio.add_position(symbol, shares, price):
                                 st.success(f"Added {shares} shares of {symbol}")
                                 st.session_state.show_add_position = False
-                                st.rerun()
+                                # Clear session state to force refresh
+                                st.session_state.portfolio = Portfolio()
+                                st.experimental_rerun()
                             else:
                                 st.error(f"Failed to add position to portfolio")
                         else:
@@ -62,7 +64,7 @@ if st.session_state.show_add_position:
         with col2:
             if st.button("Cancel"):
                 st.session_state.show_add_position = False
-                st.rerun()
+                st.experimental_rerun()
 
 # Get current holdings
 print("Loading portfolio positions...")
@@ -80,6 +82,7 @@ if not holdings.empty:
         for tab, symbol in zip(tabs, stocks):
             with tab:
                 try:
+                    print(f"Fetching data for {symbol}...")  # Debug print
                     stock_data = market_data.get_stock_data(symbol, period='1mo')
                     if not stock_data.empty:
                         # Price display
@@ -143,13 +146,16 @@ if not holdings.empty:
                         if st.button("Remove Position", key=f"remove_{symbol}"):
                             if st.session_state.portfolio.remove_position(symbol):
                                 st.success(f"Removed {symbol}")
-                                st.rerun()
+                                # Clear session state to force refresh
+                                st.session_state.portfolio = Portfolio()
+                                st.experimental_rerun()
                             else:
                                 st.error(f"Failed to remove {symbol}")
                     else:
                         st.error(f"Could not load data for {symbol}")
                 except Exception as e:
                     st.error(f"Error displaying {symbol}: {str(e)}")
+                    print(f"Error for {symbol}: {str(e)}")  # Debug print
 else:
     st.info("Add positions to your portfolio to view stock analysis")
 
