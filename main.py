@@ -36,19 +36,17 @@ if st.session_state.show_add_position:
     with st.container():
         st.markdown("### Add New Position")
         symbol = st.text_input("Stock Symbol").upper()
-        shares = st.number_input("Number of Shares", min_value=0.0, step=1.0)
-        price = st.number_input("Entry Price", min_value=0.0, step=0.01)
 
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Add Position"):
-                if symbol and shares > 0 and price > 0:
+                if symbol:
                     try:
                         # Verify stock exists
                         stock_data = market_data.get_stock_data(symbol, period='1d')
                         if not stock_data.empty:
-                            if st.session_state.portfolio.add_position(symbol, shares, price):
-                                st.success(f"Added {shares} shares of {symbol}")
+                            if st.session_state.portfolio.add_position(symbol, 1.0, 1.0):
+                                st.success(f"Added {symbol} to portfolio")
                                 st.session_state.show_add_position = False
                                 # Clear session state to force refresh
                                 st.session_state.portfolio = Portfolio()
@@ -60,7 +58,7 @@ if st.session_state.show_add_position:
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
                 else:
-                    st.error("Please fill in all fields correctly")
+                    st.error("Please enter a stock symbol")
         with col2:
             if st.button("Cancel"):
                 st.session_state.show_add_position = False
@@ -82,7 +80,7 @@ if not holdings.empty:
         for tab, symbol in zip(tabs, stocks):
             with tab:
                 try:
-                    print(f"Fetching data for {symbol}...")  # Debug print
+                    print(f"Fetching data for {symbol}...")
                     stock_data = market_data.get_stock_data(symbol, period='1mo')
                     if not stock_data.empty:
                         # Price display
@@ -124,7 +122,6 @@ if not holdings.empty:
                         # News section
                         st.markdown("## Recent Market News")
                         try:
-                            st.info(f"Loading news for {symbol}...")
                             news_data = market_data.get_news_analysis(symbol)
 
                             if news_data and news_data.get('articles'):
@@ -155,7 +152,7 @@ if not holdings.empty:
                         st.error(f"Could not load data for {symbol}")
                 except Exception as e:
                     st.error(f"Error displaying {symbol}: {str(e)}")
-                    print(f"Error for {symbol}: {str(e)}")  # Debug print
+                    print(f"Error for {symbol}: {str(e)}")
 else:
     st.info("Add positions to your portfolio to view stock analysis")
 

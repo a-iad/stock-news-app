@@ -10,8 +10,8 @@ class NewsAnalyzer:
         self.news_api_key = os.environ.get('NEWS_API_KEY')
         self.deepseek_api_key = os.environ.get('DEEPSEEK_API_KEY')
         self.news_api_url = "https://newsapi.org/v2/everything"
-        self.deepseek_url = "https://api.deepseek.com/v1/chat/completions"  # Fixed URL
-        print("NewsAnalyzer initialized")
+        self.deepseek_url = "https://api.deepseek.com/v1/chat/completions"
+
         if not self.news_api_key:
             print("WARNING: NEWS_API_KEY not found in environment")
         if not self.deepseek_api_key:
@@ -20,9 +20,6 @@ class NewsAnalyzer:
     def _call_deepseek_api(self, prompt: str) -> Dict[str, Any]:
         """Make API call to DeepSeek."""
         try:
-            print(f"\nSending to DeepSeek API: {prompt[:100]}...")
-            print("Checking API key:", "Available" if self.deepseek_api_key else "Missing")
-
             if not self.deepseek_api_key:
                 print("ERROR: No DeepSeek API key found")
                 return None
@@ -42,27 +39,36 @@ class NewsAnalyzer:
                 "temperature": 0.7
             }
 
-            print("Request URL:", self.deepseek_url)
-            print("Request payload:", json.dumps(payload))
-
             response = requests.post(
                 self.deepseek_url,
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=60  # Increased timeout
             )
 
-            print(f"DeepSeek response status: {response.status_code}")
             if response.status_code == 200:
                 result = response.json()
-                print("Successfully parsed response JSON")
-                return result['choices'][0]['message']['content']
+                analysis = result['choices'][0]['message']['content']
+                return analysis
             else:
                 print(f"DeepSeek API error: {response.text}")
                 return None
 
-        except requests.exceptions.RequestException as e:
-            print(f"DeepSeek API connection error: {str(e)}")
+        except requests.exceptions.Timeout:
+            print("DeepSeek API timeout - trying with a shorter prompt")
+            # Retry with shorter prompt
+            short_prompt = prompt[:500] + "...\nProvide brief analysis."
+            try:
+                response = requests.post(
+                    self.deepseek_url,
+                    headers=headers,
+                    json={"model": "deepseek-chat", "messages": [{"role": "user", "content": short_prompt}]},
+                    timeout=30
+                )
+                if response.status_code == 200:
+                    return response.json()['choices'][0]['message']['content']
+            except:
+                pass
             return None
         except Exception as e:
             print(f"DeepSeek API error: {str(e)}")
@@ -75,35 +81,31 @@ class NewsAnalyzer:
             return None
 
         try:
-            if self.deepseek_api_key:
-                prompt = (
-                    f"Article: {article['title']}\n{article['description']}\n\n"
-                    "Provide a detailed analysis (max 400 words):\n"
-                    "1. Key people/companies mentioned and their roles (focus on less known ones)\n"
-                    "2. Main news summary and explanation of any intermediate/complex financial terms\n"
-                    "3. Potential market impact explained in straightforward terms\n"
-                    "4. Expected effect on stock price and reasoning\n\n"
-                    "Note: No need to explain basic terms like stock price, market cap, or P/E ratio."
-                )
+            prompt = (
+                f"Analyze this news article about {symbol} ({company_name if company_name else 'company'}):\n"
+                f"Title: {article['title']}\n"
+                f"Content: {article['description']}\n\n"
+                "Provide a concise analysis:\n"
+                "1. Key points and impact on company\n"
+                "2. Potential effect on stock price\n"
+                "3. Market significance"
+            )
 
-                analysis = self._call_deepseek_api(prompt)
-                if analysis:
-                    return {
-                        'article_summary': article['title'],
-                        'significance': analysis,
-                        'market_impact': 'Very Positive' if 'positive' in analysis.lower()
-                                          else 'Somewhat Positive' if 'increase' in analysis.lower()
-                                          else 'Very Negative' if 'negative' in analysis.lower()
-                                          else 'Somewhat Negative' if 'decline' in analysis.lower()
-                                          else 'Ambivalent',
-                        'impact_explanation': analysis
-                    }
+            analysis = self._call_deepseek_api(prompt)
+
+            if analysis:
+                return {
+                    'article_summary': article['title'],
+                    'significance': analysis,
+                    'market_impact': self._determine_market_impact(analysis),
+                    'impact_explanation': analysis
+                }
 
             return {
                 'article_summary': article['title'],
-                'significance': "Article analysis currently unavailable",
-                'market_impact': "Ambivalent",
-                'impact_explanation': "Unable to analyze specific impact"
+                'significance': "Technical difficulties in analyzing article",
+                'market_impact': "Neutral",
+                'impact_explanation': "Unable to analyze at this time"
             }
 
         except Exception as e:
@@ -111,58 +113,62 @@ class NewsAnalyzer:
             return {
                 'article_summary': article['title'],
                 'significance': "Error in article analysis",
-                'market_impact': "Ambivalent",
+                'market_impact': "Neutral",
                 'impact_explanation': "Analysis error occurred"
             }
+
+    def _determine_market_impact(self, analysis: str) -> str:
+        """Determine market impact from analysis text."""
+        analysis_lower = analysis.lower()
+        if 'highly positive' in analysis_lower or 'strong positive' in analysis_lower:
+            return 'Very Positive'
+        elif 'positive' in analysis_lower or 'increase' in analysis_lower:
+            return 'Somewhat Positive'
+        elif 'highly negative' in analysis_lower or 'strong negative' in analysis_lower:
+            return 'Very Negative'
+        elif 'negative' in analysis_lower or 'decrease' in analysis_lower:
+            return 'Somewhat Negative'
+        return 'Neutral'
 
     def fetch_relevant_news(self, symbol: str, company_name: str = None) -> Dict[str, Any]:
         """Fetch and analyze news for a stock."""
         try:
-            print(f"\nFetching news for {symbol} ({company_name if company_name else 'no company name'})")
+            print(f"\nFetching news for {symbol}")
+
+            if not self.news_api_key:
+                return {'articles': []}
 
             # Prepare search query
-            query_parts = [f"({symbol} stock OR {company_name})" if company_name else symbol]
-            query = ' '.join(query_parts + ['AND (market OR earnings OR financial OR economy)'])
-            print(f"Search query: {query}")
+            query = f"({symbol} OR {company_name}) AND (stock OR market OR trading OR earnings)"
 
             params = {
                 'q': query,
                 'apiKey': self.news_api_key,
                 'language': 'en',
                 'sortBy': 'relevancy',
-                'pageSize': 10,
-                'from': (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                'pageSize': 5,
+                'from': (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d')
             }
 
-            response = requests.get(self.news_api_url, params=params)
+            response = requests.get(self.news_api_url, params=params, timeout=30)
             if response.status_code != 200:
-                print(f"News API error: Status {response.status_code}")
-                print(f"Response: {response.text}")
+                print(f"News API error: {response.status_code}")
                 return {'articles': []}
 
             articles = response.json().get('articles', [])
             if not articles:
-                print("No articles found")
                 return {'articles': []}
 
-            print(f"Found {len(articles)} articles")
             processed_articles = []
-
-            for i, article in enumerate(articles[:4]):
-                try:
-                    article_analysis = self._analyze_article(article, symbol, company_name)
-                    if article_analysis:
-                        processed_articles.append({
-                            'title': article['title'],
-                            'article_summary': article_analysis.get('article_summary', ''),
-                            'url': article['url'],
-                            'published_at': article['publishedAt'],
-                            'analysis': article_analysis
-                        })
-                        print(f"Processed article {i+1}")
-                except Exception as e:
-                    print(f"Error processing article {i+1}: {str(e)}")
-                    continue
+            for article in articles[:3]:  # Process top 3 articles
+                analysis = self._analyze_article(article, symbol, company_name)
+                if analysis:
+                    processed_articles.append({
+                        'title': article['title'],
+                        'url': article['url'],
+                        'published_at': article['publishedAt'],
+                        'analysis': analysis
+                    })
 
             return {'articles': processed_articles}
 
