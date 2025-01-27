@@ -80,8 +80,31 @@ if not st.session_state.portfolio.holdings.empty:
             after_hours_pct = (after_hours_change / current_price) * 100
             st.caption(f"After hours {after_hours:.2f} {after_hours_change:+.2f} ({after_hours_pct:+.2f}%)")
 
+            # Time scale buttons
+            time_scales = ['1D', '5D', '1M', '6M', 'YTD', '1Y', '5Y', 'Max']
+            cols = st.columns(len(time_scales))
+            selected_scale = None
+
+            for i, scale in enumerate(time_scales):
+                with cols[i]:
+                    if st.button(scale, key=f"{symbol}_{scale}"):
+                        selected_scale = scale
+
+            # Map button selection to yfinance period
+            period_map = {
+                '1D': '1d', '5D': '5d', '1M': '1mo',
+                '6M': '6mo', 'YTD': 'ytd', '1Y': '1y',
+                '5Y': '5y', 'Max': 'max'
+            }
+
+            # Default to 1M if no selection
+            period = period_map[selected_scale] if selected_scale else '1mo'
+
+            # Fetch data for selected period
+            display_data = market_data.get_stock_data(symbol, period=period)
+
             # Price chart
-            fig = px.line(stock_data, x=stock_data.index, y='Close', 
+            fig = px.line(display_data, x=display_data.index, y='Close', 
                          title=None)
             fig.update_layout(
                 showlegend=False,

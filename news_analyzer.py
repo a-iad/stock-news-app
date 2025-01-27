@@ -78,12 +78,12 @@ class NewsAnalyzer:
             if self.deepseek_api_key:
                 prompt = (
                     f"Article: {article['title']}\n{article['description']}\n\n"
-                    "Provide a detailed analysis (max 400 words) for a non-expert audience:\n"
-                    "1. Explain who are the key people/companies mentioned and their roles\n"
-                    "2. Summarize the main news and define any financial terms used\n"
-                    "3. Explain the potential market impact in simple terms\n"
-                    "4. What does this mean for the stock price and why?\n\n"
-                    "Use clear, simple language and explain financial concepts as if speaking to someone new to investing."
+                    "Provide a detailed analysis (max 400 words):\n"
+                    "1. Key people/companies mentioned and their roles (focus on less known ones)\n"
+                    "2. Main news summary and explanation of any intermediate/complex financial terms\n"
+                    "3. Potential market impact explained in straightforward terms\n"
+                    "4. Expected effect on stock price and reasoning\n\n"
+                    "Note: No need to explain basic terms like stock price, market cap, or P/E ratio."
                 )
 
                 analysis = self._call_deepseek_api(prompt)
