@@ -35,8 +35,8 @@ if st.session_state.show_add_position:
         st.markdown("### Add New Position")
         with st.form("add_position_modal"):
             symbol = st.text_input("Stock Symbol").upper()
-            shares = st.number_input("Number of Shares", min_value=0.0)
-            price = st.number_input("Entry Price", min_value=0.0)
+            shares = st.number_input("Number of Shares", min_value=0.0, step=1.0)
+            price = st.number_input("Entry Price", min_value=0.0, step=0.01)
 
             col1, col2 = st.columns([1, 1])
             with col1:
@@ -46,11 +46,16 @@ if st.session_state.show_add_position:
                     st.session_state.show_add_position = False
                     st.rerun()
 
-            if submit and symbol and shares and price:
-                st.session_state.portfolio.add_position(symbol, shares, price)
-                st.session_state.show_add_position = False
-                st.success(f"Added {shares} shares of {symbol}")
-                st.rerun()
+            if submit and symbol and shares > 0 and price > 0:
+                # Verify the symbol exists
+                stock_data = market_data.get_stock_data(symbol, period='1d')
+                if not stock_data.empty:
+                    st.session_state.portfolio.add_position(symbol, shares, price)
+                    st.session_state.show_add_position = False
+                    st.success(f"Added {shares} shares of {symbol}")
+                    st.rerun()
+                else:
+                    st.error(f"Invalid stock symbol: {symbol}")
 
 # Display stocks and their news vertically
 if not st.session_state.portfolio.holdings.empty:
@@ -104,7 +109,7 @@ if not st.session_state.portfolio.holdings.empty:
             display_data = market_data.get_stock_data(symbol, period=period)
 
             # Price chart
-            fig = px.line(display_data, x=display_data.index, y='Close', 
+            fig = px.line(display_data, x=display_data.index, y='Close',
                          title=None)
             fig.update_layout(
                 showlegend=False,
