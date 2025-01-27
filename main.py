@@ -35,34 +35,34 @@ with st.container():
 if st.session_state.show_add_position:
     with st.container():
         st.markdown("### Add New Position")
-        with st.form("add_position_form"):
-            symbol = st.text_input("Stock Symbol").upper()
-            shares = st.number_input("Number of Shares", min_value=0.0, step=1.0)
-            price = st.number_input("Entry Price", min_value=0.0, step=0.01)
+        symbol = st.text_input("Stock Symbol").upper()
+        shares = st.number_input("Number of Shares", min_value=0.0, step=1.0)
+        price = st.number_input("Entry Price", min_value=0.0, step=0.01)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                submitted = st.form_submit_button("Add Position")
-            with col2:
-                if st.form_submit_button("Cancel"):
-                    st.session_state.show_add_position = False
-                    st.rerun()
-
-            if submitted and symbol and shares > 0 and price > 0:
-                try:
-                    # Verify stock exists
-                    stock_data = market_data.get_stock_data(symbol, period='1d')
-                    if not stock_data.empty:
-                        if st.session_state.portfolio.add_position(symbol, shares, price):
-                            st.success(f"Added {shares} shares of {symbol}")
-                            st.session_state.show_add_position = False
-                            st.rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Add Position"):
+                if symbol and shares > 0 and price > 0:
+                    try:
+                        # Verify stock exists
+                        stock_data = market_data.get_stock_data(symbol, period='1d')
+                        if not stock_data.empty:
+                            if st.session_state.portfolio.add_position(symbol, shares, price):
+                                st.success(f"Added {shares} shares of {symbol}")
+                                st.session_state.show_add_position = False
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to add position to portfolio")
                         else:
-                            st.error(f"Failed to add position to portfolio")
-                    else:
-                        st.error(f"Invalid symbol: {symbol}")
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                            st.error(f"Invalid symbol: {symbol}")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+                else:
+                    st.error("Please fill in all fields correctly")
+        with col2:
+            if st.button("Cancel"):
+                st.session_state.show_add_position = False
+                st.rerun()
 
 # Get current holdings
 print("Loading portfolio positions...")
