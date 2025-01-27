@@ -22,6 +22,15 @@ wheels = [
 ]
 
 [[package]]
+name = "appdirs"
+version = "1.4.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/d8/05696357e0311f5b5c316d7b95f46c669dd9c15aaeecbb48c7d0aeb88c40/appdirs-1.4.4.tar.gz", hash = "sha256:7d5d0167b2b1ba821647616af46a749d1c653740dd0d2415100fe26e27afdf41", size = 13470 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/00/2344469e2084fb287c2e0b57b72910309874c3245463acd6cf5e3db69324/appdirs-1.4.4-py2.py3-none-any.whl", hash = "sha256:a841dacd6b99318a741b166adb07e19ee71a274450e68237b4650ca1055ab128", size = 9566 },
+]
+
+[[package]]
 name = "attrs"
 version = "24.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -567,15 +576,6 @@ wheels = [
 ]
 
 [[package]]
-name = "platformdirs"
-version = "4.3.6"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/13/fc/128cc9cb8f03208bdbf93d3aa862e16d376844a14f9a0ce5cf4507372de4/platformdirs-4.3.6.tar.gz", hash = "sha256:357fb2acbc885b0419afd3ce3ed34564c13c9b95c89360cd9563f73aa5e2b907", size = 21302 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/a6/bc1012356d8ece4d66dd75c4b9fc6c1f6650ddd5991e421177d9f8f671be/platformdirs-4.3.6-py3-none-any.whl", hash = "sha256:73e575e1408ab8103900836b97580d5307456908a03e92031bab39e4554cc3fb", size = 18439 },
-]
-
-[[package]]
 name = "plotly"
 version = "5.24.1"
 source = { registry = "https://pypi.org/simple" }
@@ -775,7 +775,7 @@ requires-dist = [
     { name = "streamlit", specifier = ">=1.41.1" },
     { name = "textblob", specifier = ">=0.19.0" },
     { name = "tweepy", specifier = ">=4.15.0" },
-    { name = "yfinance", specifier = ">=0.2.52" },
+    { name = "yfinance", specifier = "==0.2.35" },
 ]
 
 [[package]]
@@ -1150,9 +1150,10 @@ wheels = [
 
 [[package]]
 name = "yfinance"
-version = "0.2.52"
+version = "0.2.35"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "appdirs" },
     { name = "beautifulsoup4" },
     { name = "frozendict" },
     { name = "html5lib" },
@@ -1161,11 +1162,10 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "peewee" },
-    { name = "platformdirs" },
     { name = "pytz" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/97/68270531d9f1bc62a50970f8860633baa013ac2fe9464c9ae5b3be675ddb/yfinance-0.2.52.tar.gz", hash = "sha256:d2c2ed9bc935596934cba99fca0f05beaa8384648f78105c77754e92f11bf72f", size = 117683 }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/23/5b1b44a45767c08a86736d649b5dec4edc630c6c0522384214c4bad33473/yfinance-0.2.35.tar.gz", hash = "sha256:bfd5102cc9e5aa259c26b86fb53c2abe9e05ff63d387c03adf0b4ff2f6f2375a", size = 69693 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/51/9f26741aeeb149fe75b30bceee389cf9920f9458d0f213539398aa217b99/yfinance-0.2.52-py2.py3-none-any.whl", hash = "sha256:3ca150da85f56b999687e13b72304338499a417d5bad6af9da2aa13821992bd7", size = 108479 },
+    { url = "https://files.pythonhosted.org/packages/58/f7/a966b800b49cb5379e348bf0717df481051714a99ece15289718562f6952/yfinance-0.2.35-py2.py3-none-any.whl", hash = "sha256:f3d15cbf06fadd06c607520f70c54cbae4560a99675307ee2383d000232614f8", size = 72190 },
 ]

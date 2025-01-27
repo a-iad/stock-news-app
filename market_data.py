@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from predictions import MarketPredictor
 from news_analyzer import NewsAnalyzer
 import traceback
+import time
 
 class MarketData:
     def __init__(self):
@@ -20,54 +21,58 @@ class MarketData:
             print(f"Company name: {company_name}")
 
             news_data = self.news_analyzer.fetch_relevant_news(symbol, company_name)
-
-            # Add debug prints
-            print(f"News data type: {type(news_data)}")
-            print(f"News data content: {news_data}")
-
-            if news_data and isinstance(news_data, dict) and news_data.get('articles'):
-                print(f"Successfully fetched news for {symbol}")
-                print(f"Found {len(news_data['articles'])} articles")
-                return news_data
-
-            print(f"No news data returned for {symbol}")
-            return {'articles': [], 'error': 'No news data available'}
+            return news_data if news_data and news_data.get('articles') else {'articles': []}
 
         except Exception as e:
             print(f"Error in get_news_analysis for {symbol}: {str(e)}")
             traceback.print_exc()
-            return {'articles': [], 'error': str(e)}
+            return {'articles': []}
 
     @staticmethod
     def get_ticker_info(symbol):
         """Get additional ticker information."""
         try:
+            print(f"\nFetching ticker info for {symbol}")
             ticker = yf.Ticker(symbol)
             info = ticker.info
-            return {
+            result = {
                 'marketCap': info.get('marketCap'),
                 'trailingPE': info.get('trailingPE'),
                 'dividendYield': info.get('dividendYield', 0)
             }
+            print(f"Successfully fetched ticker info for {symbol}")
+            return result
         except Exception as e:
             print(f"Error fetching ticker info for {symbol}: {str(e)}")
+            traceback.print_exc()
             return None
 
     @staticmethod
     def get_stock_data(symbol, period='1mo'):
         """Fetch stock data from Yahoo Finance."""
         try:
-            print(f"\nFetching stock data for {symbol} ({period})")  # Debug print
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(period=period)
-            if data.empty:
-                print(f"No data found for symbol: {symbol}")
-                return pd.DataFrame()
-            print(f"Successfully fetched {len(data)} data points for {symbol}")  # Debug print
-            return data
+            print(f"\nFetching stock data for {symbol} ({period})")
+
+            # Add retry logic for robustness
+            for attempt in range(3):
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period=period)
+                    if not data.empty:
+                        print(f"Successfully fetched {len(data)} data points for {symbol}")
+                        return data
+                    print(f"Attempt {attempt + 1}: No data found for {symbol}, retrying...")
+                except Exception as inner_e:
+                    print(f"Attempt {attempt + 1} failed: {str(inner_e)}")
+                    if attempt < 2:  # Don't sleep on last attempt
+                        time.sleep(1)  # Wait before retry
+
+            print(f"All attempts failed for {symbol}")
+            return pd.DataFrame()
+
         except Exception as e:
             print(f"Error fetching data for {symbol}: {str(e)}")
-            traceback.print_exc()  # Add stack trace
+            traceback.print_exc()
             return pd.DataFrame()
 
     def get_stock_prediction(self, symbol):
@@ -108,8 +113,7 @@ class MarketData:
             print(f"Error in market sentiment analysis: {str(e)}")
             return None
 
-    @staticmethod
-    def get_market_indicators():
+    def get_market_indicators(self):
         """Fetch major market indicators."""
         try:
             indicators = {
@@ -121,10 +125,13 @@ class MarketData:
             }
             data = {}
             for symbol, name in indicators.items():
-                ticker = yf.Ticker(symbol)
-                hist = ticker.history(period='1d')
-                if not hist.empty:
-                    data[name] = hist['Close'].iloc[-1]
+                try:
+                    ticker = yf.Ticker(symbol)
+                    hist = ticker.history(period='1d')
+                    if not hist.empty:
+                        data[name] = hist['Close'].iloc[-1]
+                except Exception as e:
+                    print(f"Error fetching {name}: {str(e)}")
             return data
         except Exception as e:
             print(f"Error fetching market indicators: {str(e)}")
