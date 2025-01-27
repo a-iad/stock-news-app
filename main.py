@@ -94,7 +94,7 @@ if not holdings.empty:
 
                         # Price chart
                         fig = px.line(stock_data, x=stock_data.index, y='Close',
-                                    title=None)
+                                        title=None)
                         fig.update_layout(
                             showlegend=False,
                             xaxis_title=None,
@@ -122,20 +122,29 @@ if not holdings.empty:
                         # News section
                         st.markdown("## Recent Market News")
                         try:
-                            news_data = market_data.get_news_analysis(symbol)
+                            with st.spinner('Loading news articles and analyzing market impact...'):
+                                progress_bar = st.progress(0)
+                                news_data = market_data.get_news_analysis(symbol)
+                                progress_bar.progress(50)  # Update after fetching news
 
-                            if news_data and news_data.get('articles'):
-                                for article in news_data['articles']:
-                                    with st.container():
-                                        st.markdown("---")
-                                        st.markdown(f"### {article['title']}")
-                                        analysis = article.get('analysis', {})
-                                        if analysis and analysis.get('significance'):
-                                            st.write(analysis['significance'])
-                                            st.info(f"Market Impact: {analysis.get('market_impact', 'Ambivalent')}")
-                                            st.caption(f"Published: {article.get('published_at', 'N/A')}")
-                            else:
-                                st.warning("No recent news available for this stock.")
+                                if news_data and news_data.get('articles'):
+                                    articles = news_data['articles']
+                                    for idx, article in enumerate(articles):
+                                        progress_value = 50 + ((idx + 1) / len(articles)) * 50
+                                        progress_bar.progress(int(progress_value))
+
+                                        with st.container():
+                                            st.markdown("---")
+                                            st.markdown(f"### {article['title']}")
+                                            analysis = article.get('analysis', {})
+                                            if analysis and analysis.get('significance'):
+                                                st.write(analysis['significance'])
+                                                st.info(f"Market Impact: {analysis.get('market_impact', 'Ambivalent')}")
+                                                st.caption(f"Published: {article.get('published_at', 'N/A')}")
+
+                                    progress_bar.empty()  # Remove progress bar when done
+                                else:
+                                    st.warning("No recent news available for this stock.")
                         except Exception as e:
                             st.error(f"Error loading news: {str(e)}")
 
