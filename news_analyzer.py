@@ -81,14 +81,16 @@ class NewsAnalyzer:
             return None
 
         try:
+            # Enhanced prompt for more focused analysis
             prompt = (
-                f"Analyze this news article about {symbol} ({company_name if company_name else 'company'}):\n"
+                f"As a financial analyst, analyze this news article about {symbol} ({company_name if company_name else 'company'}):\n"
                 f"Title: {article['title']}\n"
                 f"Content: {article['description']}\n\n"
-                "Provide a concise analysis:\n"
-                "1. Key points and impact on company\n"
-                "2. Potential effect on stock price\n"
-                "3. Market significance"
+                "Provide a concise analysis focusing on:\n"
+                "1. Direct impact on the company's stock price and business\n"
+                "2. Key developments or changes mentioned\n"
+                "3. Potential short-term market implications\n"
+                "Keep the analysis focused on actionable insights for investors."
             )
 
             analysis = self._call_deepseek_api(prompt)
@@ -101,21 +103,11 @@ class NewsAnalyzer:
                     'impact_explanation': analysis
                 }
 
-            return {
-                'article_summary': article['title'],
-                'significance': "Technical difficulties in analyzing article",
-                'market_impact': "Neutral",
-                'impact_explanation': "Unable to analyze at this time"
-            }
+            return None
 
         except Exception as e:
             print(f"Article analysis failed: {str(e)}")
-            return {
-                'article_summary': article['title'],
-                'significance': "Error in article analysis",
-                'market_impact': "Neutral",
-                'impact_explanation': "Analysis error occurred"
-            }
+            return None
 
     def _determine_market_impact(self, analysis: str) -> str:
         """Determine market impact from analysis text."""
@@ -138,15 +130,17 @@ class NewsAnalyzer:
             if not self.news_api_key:
                 return {'articles': []}
 
-            # Prepare search query
-            query = f"({symbol} OR {company_name}) AND (stock OR market OR trading OR earnings)"
+            # More specific query with exact symbol matching and company context
+            query = f'"{symbol}" AND ("stock price" OR "market" OR "trading" OR "earnings")'
+            if company_name:
+                query += f' AND "{company_name}"'
 
             params = {
                 'q': query,
                 'apiKey': self.news_api_key,
                 'language': 'en',
                 'sortBy': 'relevancy',
-                'pageSize': 5,
+                'pageSize': 10,  # Fetch more to filter
                 'from': (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d')
             }
 
@@ -159,8 +153,25 @@ class NewsAnalyzer:
             if not articles:
                 return {'articles': []}
 
+            # Filter articles more strictly for relevance
+            relevant_articles = []
+            for article in articles:
+                title = article.get('title', '').lower()
+                description = article.get('description', '').lower()
+                content = f"{title} {description}"
+
+                # Check if article is directly related to the stock/company
+                is_relevant = (
+                    symbol.lower() in content or 
+                    (company_name and company_name.lower() in content)
+                )
+
+                if is_relevant:
+                    relevant_articles.append(article)
+
+            # Process top 3 most relevant articles
             processed_articles = []
-            for article in articles[:3]:  # Process top 3 articles
+            for article in relevant_articles[:3]:
                 analysis = self._analyze_article(article, symbol, company_name)
                 if analysis:
                     processed_articles.append({
