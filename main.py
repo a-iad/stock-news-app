@@ -58,7 +58,7 @@ if st.session_state.show_add_position:
                             st.session_state.show_add_position = False
                             st.rerun()
                         else:
-                            st.error("Failed to add position")
+                            st.error(f"Failed to add position to portfolio")
                     else:
                         st.error(f"Invalid symbol: {symbol}")
                 except Exception as e:
@@ -108,6 +108,36 @@ if not holdings.empty:
                             st.metric("Open", f"${stock_data['Open'].iloc[-1]:.2f}")
                             st.metric("High", f"${stock_data['High'].iloc[-1]:.2f}")
                             st.metric("Low", f"${stock_data['Low'].iloc[-1]:.2f}")
+
+                        # Additional metrics
+                        ticker_info = market_data.get_ticker_info(symbol)
+                        if ticker_info:
+                            with col2:
+                                st.metric("Market Cap", f"{ticker_info.get('marketCap', 'N/A')}")
+                                st.metric("P/E Ratio", f"{ticker_info.get('trailingPE', 'N/A'):.2f}")
+                            with col3:
+                                st.metric("Div Yield", f"{ticker_info.get('dividendYield', 0)*100:.3f}%")
+
+                        # News section
+                        st.markdown("## Recent Market News")
+                        try:
+                            st.info(f"Loading news for {symbol}...")
+                            news_data = market_data.get_news_analysis(symbol)
+
+                            if news_data and news_data.get('articles'):
+                                for article in news_data['articles']:
+                                    with st.container():
+                                        st.markdown("---")
+                                        st.markdown(f"### {article['title']}")
+                                        analysis = article.get('analysis', {})
+                                        if analysis and analysis.get('significance'):
+                                            st.write(analysis['significance'])
+                                            st.info(f"Market Impact: {analysis.get('market_impact', 'Ambivalent')}")
+                                            st.caption(f"Published: {article.get('published_at', 'N/A')}")
+                            else:
+                                st.warning("No recent news available for this stock.")
+                        except Exception as e:
+                            st.error(f"Error loading news: {str(e)}")
 
                         # Remove position button
                         if st.button("Remove Position", key=f"remove_{symbol}"):
