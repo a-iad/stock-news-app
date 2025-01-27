@@ -78,11 +78,12 @@ class NewsAnalyzer:
             if self.deepseek_api_key:
                 prompt = (
                     f"Article: {article['title']}\n{article['description']}\n\n"
-                    "Provide a brief analysis (max 200 words):\n"
-                    "1. Key takeaway in one sentence\n"
-                    "2. Potential market impact (positive/negative/neutral)\n"
-                    "3. One specific implication for stock performance\n"
-                    "Keep responses clear and concise."
+                    "Provide a detailed analysis (max 400 words) for a non-expert audience:\n"
+                    "1. Explain who are the key people/companies mentioned and their roles\n"
+                    "2. Summarize the main news and define any financial terms used\n"
+                    "3. Explain the potential market impact in simple terms\n"
+                    "4. What does this mean for the stock price and why?\n\n"
+                    "Use clear, simple language and explain financial concepts as if speaking to someone new to investing."
                 )
 
                 analysis = self._call_deepseek_api(prompt)
@@ -90,11 +91,11 @@ class NewsAnalyzer:
                     return {
                         'article_summary': article['title'],
                         'significance': analysis,
-                        'market_impact': 'Very Positive' if 'positive' in analysis.lower() 
-                                  else 'Somewhat Positive' if 'increase' in analysis.lower()
-                                  else 'Very Negative' if 'negative' in analysis.lower()
-                                  else 'Somewhat Negative' if 'decline' in analysis.lower()
-                                  else 'Ambivalent',
+                        'market_impact': 'Very Positive' if 'positive' in analysis.lower()
+                                          else 'Somewhat Positive' if 'increase' in analysis.lower()
+                                          else 'Very Negative' if 'negative' in analysis.lower()
+                                          else 'Somewhat Negative' if 'decline' in analysis.lower()
+                                          else 'Ambivalent',
                         'impact_explanation': analysis
                     }
 

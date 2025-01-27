@@ -54,28 +54,29 @@ if st.session_state.show_add_position:
                 st.success(f"Added {shares} shares of {symbol}")
                 st.rerun()
 
-# Period selector for all stocks
+# Display stocks and their news vertically
 if not st.session_state.portfolio.holdings.empty:
-    period_options = {
-        'day': '1d',
-        'week': '5d',
-        'month': '1mo'
-    }
-    selected_period = st.selectbox(
-        "Select Time Period",
-        options=list(period_options.keys()),
-        format_func=lambda x: x.capitalize(),
-        key='period_selector'
-    )
-    st.session_state.selected_period = selected_period
-
-    # Display stocks and their news vertically
     stocks = st.session_state.portfolio.holdings['Symbol'].tolist()
 
     for symbol in stocks:
         # Stock container
         st.markdown("---")
         st.markdown(f"## {symbol}")
+
+        # Period selector for individual stock
+        period_options = {
+            'day': '1d',
+            'week': '5d',
+            'month': '1mo'
+        }
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            selected_period = st.selectbox(
+                "Time Range",
+                options=list(period_options.keys()),
+                format_func=lambda x: x.capitalize(),
+                key=f'period_selector_{symbol}'
+            )
 
         # Stock data
         stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
