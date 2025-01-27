@@ -6,20 +6,21 @@ from market_data import MarketData
 from portfolio import Portfolio
 from alerts import AlertSystem
 
+# Page configuration
+st.set_page_config(page_title="Market Intelligence Dashboard", layout="wide")
+
 # Initialize components
+print("Initializing application components...")
 market_data = MarketData()
 
 # Initialize session state
 if 'portfolio' not in st.session_state:
+    print("Creating new portfolio in session state")
     st.session_state.portfolio = Portfolio()
-    print("Portfolio initialized in session state")  # Debug print
 if 'alerts' not in st.session_state:
     st.session_state.alerts = AlertSystem()
 if 'show_add_position' not in st.session_state:
     st.session_state.show_add_position = False
-
-# Page configuration
-st.set_page_config(page_title="Market Intelligence Dashboard", layout="wide")
 
 # Navigation bar
 with st.container():
@@ -34,25 +35,24 @@ with st.container():
 if st.session_state.show_add_position:
     with st.container():
         st.markdown("### Add New Position")
-        with st.form("add_position_modal"):
+        with st.form("add_position_form"):
             symbol = st.text_input("Stock Symbol").upper()
             shares = st.number_input("Number of Shares", min_value=0.0, step=1.0)
             price = st.number_input("Entry Price", min_value=0.0, step=0.01)
 
-            col1, col2 = st.columns([1, 1])
+            col1, col2 = st.columns(2)
             with col1:
-                submit = st.form_submit_button("Add Position")
+                submitted = st.form_submit_button("Add Position")
             with col2:
                 if st.form_submit_button("Cancel"):
                     st.session_state.show_add_position = False
                     st.rerun()
 
-            if submit and symbol and shares > 0 and price > 0:
+            if submitted and symbol and shares > 0 and price > 0:
                 try:
-                    # Verify the symbol exists
+                    # Verify stock exists
                     stock_data = market_data.get_stock_data(symbol, period='1d')
                     if not stock_data.empty:
-                        # Add position and verify it was added successfully
                         if st.session_state.portfolio.add_position(symbol, shares, price):
                             st.success(f"Added {shares} shares of {symbol}")
                             st.session_state.show_add_position = False
@@ -60,110 +60,66 @@ if st.session_state.show_add_position:
                         else:
                             st.error("Failed to add position")
                     else:
-                        st.error(f"Invalid stock symbol: {symbol}")
+                        st.error(f"Invalid symbol: {symbol}")
                 except Exception as e:
-                    st.error(f"Error adding position: {str(e)}")
+                    st.error(f"Error: {str(e)}")
+
+# Get current holdings
+print("Loading portfolio positions...")
+holdings = st.session_state.portfolio.holdings
 
 # Display stocks in tabs
-holdings = st.session_state.portfolio.holdings
 if not holdings.empty:
-    print(f"Current holdings: {holdings['Symbol'].tolist()}")  # Debug print
-
-    # Create tabs
+    print(f"Found {len(holdings)} positions")
     stocks = holdings['Symbol'].tolist()
+
+    # Create tabs for each stock
     if stocks:
         tabs = st.tabs(stocks)
 
-        for idx, (tab, symbol) in enumerate(zip(tabs, stocks)):
+        for tab, symbol in zip(tabs, stocks):
             with tab:
-                stock_data = market_data.get_stock_data(symbol, period='1mo')
-                if not stock_data.empty:
-                    # Price display
-                    current_price = stock_data['Close'].iloc[-1]
-                    prev_close = stock_data['Close'].iloc[-2]
-                    price_change = current_price - prev_close
-                    price_change_pct = (price_change / prev_close) * 100
+                try:
+                    stock_data = market_data.get_stock_data(symbol, period='1mo')
+                    if not stock_data.empty:
+                        # Price display
+                        current_price = stock_data['Close'].iloc[-1]
+                        prev_close = stock_data['Close'].iloc[-2]
+                        price_change = current_price - prev_close
+                        price_change_pct = (price_change / prev_close) * 100
 
-                    st.markdown(f"### ${current_price:.2f} USD")
-                    st.markdown(f"{price_change:+.2f} ({price_change_pct:+.2f}%) today")
+                        st.markdown(f"### ${current_price:.2f} USD")
+                        st.markdown(f"{price_change:+.2f} ({price_change_pct:+.2f}%) today")
 
-                    # After hours
-                    after_hours = stock_data['Close'].iloc[-1]
-                    after_hours_change = after_hours - current_price
-                    after_hours_pct = (after_hours_change / current_price) * 100
-                    st.caption(f"After hours {after_hours:.2f} {after_hours_change:+.2f} ({after_hours_pct:+.2f}%)")
+                        # Price chart
+                        fig = px.line(stock_data, x=stock_data.index, y='Close',
+                                    title=None)
+                        fig.update_layout(
+                            showlegend=False,
+                            xaxis_title=None,
+                            yaxis_title=None,
+                            margin=dict(l=0, r=0, t=0, b=0)
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
 
-                    # Time scale buttons
-                    time_scales = ['1D', '5D', '1M', '6M', 'YTD', '1Y', '5Y', 'Max']
-                    cols = st.columns(len(time_scales))
-                    selected_scale = None
+                        # Metrics
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Open", f"${stock_data['Open'].iloc[-1]:.2f}")
+                            st.metric("High", f"${stock_data['High'].iloc[-1]:.2f}")
+                            st.metric("Low", f"${stock_data['Low'].iloc[-1]:.2f}")
 
-                    for i, scale in enumerate(time_scales):
-                        with cols[i]:
-                            if st.button(scale, key=f"{symbol}_{scale}"):
-                                selected_scale = scale
-
-                    period_map = {
-                        '1D': '1d', '5D': '5d', '1M': '1mo',
-                        '6M': '6mo', 'YTD': 'ytd', '1Y': '1y',
-                        '5Y': '5y', 'Max': 'max'
-                    }
-
-                    period = period_map[selected_scale] if selected_scale else '1mo'
-                    display_data = market_data.get_stock_data(symbol, period=period)
-
-                    # Price chart
-                    fig = px.line(display_data, x=display_data.index, y='Close',
-                                title=None)
-                    fig.update_layout(
-                        showlegend=False,
-                        xaxis_title=None,
-                        yaxis_title=None,
-                        margin=dict(l=0, r=0, t=0, b=0)
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    # Metrics
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Open", f"${stock_data['Open'].iloc[-1]:.2f}")
-                        st.metric("High", f"${stock_data['High'].iloc[-1]:.2f}")
-                        st.metric("Low", f"${stock_data['Low'].iloc[-1]:.2f}")
-
-                    ticker_info = market_data.get_ticker_info(symbol)
-                    if ticker_info:
-                        with col2:
-                            st.metric("Market Cap", f"{ticker_info.get('marketCap', 'N/A')}")
-                            st.metric("P/E Ratio", f"{ticker_info.get('trailingPE', 'N/A'):.2f}")
-                        with col3:
-                            st.metric("Div Yield", f"{ticker_info.get('dividendYield', 0)*100:.3f}%")
-
-                    # Remove button
-                    if st.button("Remove", key=f"remove_{symbol}"):
-                        if st.session_state.portfolio.remove_position(symbol):
-                            st.success(f"Removed {symbol}")
-                            st.rerun()
-                        else:
-                            st.error(f"Failed to remove {symbol}")
-
-                    # News section
-                    st.markdown("## Recent Market News")
-                    try:
-                        news_data = market_data.get_news_analysis(symbol)
-                        if news_data and news_data.get('articles'):
-                            for article in news_data['articles']:
-                                with st.container():
-                                    st.markdown("---")
-                                    st.markdown(f"### {article['title']}")
-                                    analysis = article.get('analysis', {})
-                                    if analysis and analysis.get('significance'):
-                                        st.write(analysis['significance'])
-                                        st.info(f"Market Impact: {analysis.get('market_impact', 'Ambivalent')}")
-                                        st.caption(f"Published: {article.get('published_at', 'N/A')}")
-                        else:
-                            st.warning("No recent news available for this stock.")
-                    except Exception as e:
-                        st.error(f"Error loading news: {str(e)}")
+                        # Remove position button
+                        if st.button("Remove Position", key=f"remove_{symbol}"):
+                            if st.session_state.portfolio.remove_position(symbol):
+                                st.success(f"Removed {symbol}")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to remove {symbol}")
+                    else:
+                        st.error(f"Could not load data for {symbol}")
+                except Exception as e:
+                    st.error(f"Error displaying {symbol}: {str(e)}")
 else:
     st.info("Add positions to your portfolio to view stock analysis")
 

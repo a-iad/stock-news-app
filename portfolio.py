@@ -7,17 +7,24 @@ from datetime import datetime
 class Portfolio:
     def __init__(self):
         self.holdings = pd.DataFrame(columns=['Symbol', 'Shares', 'Entry Price'])
+        print("Initializing portfolio...")  # Debug print
         self.load_portfolio()
 
     def save_portfolio(self):
         """Save portfolio to a JSON file."""
         try:
+            if self.holdings is None or self.holdings.empty:
+                print("Warning: Attempting to save empty portfolio")
+                self.holdings = pd.DataFrame(columns=['Symbol', 'Shares', 'Entry Price'])
+
             portfolio_data = self.holdings.to_dict('records')
             with open('portfolio.json', 'w') as f:
                 json.dump(portfolio_data, f)
-            print("Portfolio saved successfully")  # Add debug print
+            print(f"Portfolio saved successfully with {len(portfolio_data)} positions")
+            return True
         except Exception as e:
             print(f"Error saving portfolio: {str(e)}")
+            return False
 
     def load_portfolio(self):
         """Load portfolio from JSON file."""
@@ -25,39 +32,75 @@ class Portfolio:
             if os.path.exists('portfolio.json'):
                 with open('portfolio.json', 'r') as f:
                     portfolio_data = json.load(f)
-                self.holdings = pd.DataFrame(portfolio_data)
-                print(f"Portfolio loaded successfully: {len(self.holdings)} positions")  # Add debug print
+                if portfolio_data:
+                    self.holdings = pd.DataFrame(portfolio_data)
+                    print(f"Portfolio loaded with {len(self.holdings)} positions")
+                else:
+                    print("Empty portfolio data loaded")
+                    self.holdings = pd.DataFrame(columns=['Symbol', 'Shares', 'Entry Price'])
             else:
-                print("No portfolio file found")  # Add debug print
+                print("No portfolio file found, starting fresh")
+                self.holdings = pd.DataFrame(columns=['Symbol', 'Shares', 'Entry Price'])
+            return True
         except Exception as e:
             print(f"Error loading portfolio: {str(e)}")
+            self.holdings = pd.DataFrame(columns=['Symbol', 'Shares', 'Entry Price'])
+            return False
 
-    def add_position(self, symbol, shares, entry_price):
+    def add_position(self, symbol: str, shares: float, entry_price: float) -> bool:
         """Add a new position to the portfolio."""
         try:
+            symbol = str(symbol).upper()
+            shares = float(shares)
+            entry_price = float(entry_price)
+
+            # Check for existing position
+            if not self.holdings.empty and symbol in self.holdings['Symbol'].values:
+                print(f"Position already exists for {symbol}")
+                return False
+
             new_position = pd.DataFrame({
                 'Symbol': [symbol],
-                'Shares': [float(shares)],
-                'Entry Price': [float(entry_price)]
+                'Shares': [shares],
+                'Entry Price': [entry_price]
             })
+
             self.holdings = pd.concat([self.holdings, new_position], ignore_index=True)
-            print(f"Position added: {symbol}")  # Add debug print
-            self.save_portfolio()
-            return True
+            save_success = self.save_portfolio()
+            print(f"Position added for {symbol}: {shares} shares at ${entry_price}")
+            return save_success
         except Exception as e:
             print(f"Error adding position: {str(e)}")
             return False
 
-    def remove_position(self, symbol):
+    def remove_position(self, symbol: str) -> bool:
         """Remove a position from the portfolio."""
         try:
+            if self.holdings.empty:
+                print("Cannot remove from empty portfolio")
+                return False
+
+            initial_len = len(self.holdings)
             self.holdings = self.holdings[self.holdings['Symbol'] != symbol]
-            print(f"Position removed: {symbol}")  # Add debug print
-            self.save_portfolio()
-            return True
+
+            if len(self.holdings) == initial_len:
+                print(f"No position found for {symbol}")
+                return False
+
+            save_success = self.save_portfolio()
+            print(f"Position removed for {symbol}")
+            return save_success
         except Exception as e:
             print(f"Error removing position: {str(e)}")
             return False
+
+    def get_positions(self):
+        """Get list of current positions."""
+        try:
+            return self.holdings['Symbol'].tolist() if not self.holdings.empty else []
+        except Exception as e:
+            print(f"Error getting positions: {str(e)}")
+            return []
 
     def get_portfolio_value(self, market_data):
         """Calculate current portfolio value."""
