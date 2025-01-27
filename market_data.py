@@ -39,6 +39,21 @@ class MarketData:
             return {'articles': [], 'error': str(e)}
 
     @staticmethod
+    def get_ticker_info(symbol):
+        """Get additional ticker information."""
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            return {
+                'marketCap': info.get('marketCap'),
+                'trailingPE': info.get('trailingPE'),
+                'dividendYield': info.get('dividendYield', 0)
+            }
+        except Exception as e:
+            print(f"Error fetching ticker info for {symbol}: {str(e)}")
+            return None
+
+    @staticmethod
     def get_stock_data(symbol, period='1mo'):
         """Fetch stock data from Yahoo Finance."""
         try:

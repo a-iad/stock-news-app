@@ -11,8 +11,6 @@ if 'portfolio' not in st.session_state:
     st.session_state.portfolio = Portfolio()
 if 'alerts' not in st.session_state:
     st.session_state.alerts = AlertSystem()
-if 'selected_period' not in st.session_state:
-    st.session_state.selected_period = 'day'
 if 'show_add_position' not in st.session_state:
     st.session_state.show_add_position = False
 
@@ -63,31 +61,51 @@ if not st.session_state.portfolio.holdings.empty:
         st.markdown("---")
         st.markdown(f"## {symbol}")
 
-        # Period selector for individual stock
-        period_options = {
-            'day': '1d',
-            'week': '5d',
-            'month': '1mo'
-        }
-        col1, col2 = st.columns([3, 1])
-        with col2:
-            selected_period = st.selectbox(
-                "Time Range",
-                options=list(period_options.keys()),
-                format_func=lambda x: x.capitalize(),
-                key=f'period_selector_{symbol}'
-            )
-
-        # Stock data
-        stock_data = market_data.get_stock_data(symbol, period=period_options[selected_period])
+        # Get stock data for the last month
+        stock_data = market_data.get_stock_data(symbol, period='1mo')
         if not stock_data.empty:
+            # Current price and change
             current_price = stock_data['Close'].iloc[-1]
-            price_change = ((current_price - stock_data['Close'].iloc[0]) / stock_data['Close'].iloc[0]) * 100
-            st.metric(
-                "Current Price",
-                f"${current_price:.2f}",
-                f"{price_change:+.2f}% ({selected_period})"
+            prev_close = stock_data['Close'].iloc[-2]
+            price_change = current_price - prev_close
+            price_change_pct = (price_change / prev_close) * 100
+
+            # Price display
+            st.markdown(f"### ${current_price:.2f} USD")
+            st.markdown(f"{price_change:+.2f} ({price_change_pct:+.2f}%) today")
+
+            # After hours (using last available price)
+            after_hours = stock_data['Close'].iloc[-1]
+            after_hours_change = after_hours - current_price
+            after_hours_pct = (after_hours_change / current_price) * 100
+            st.caption(f"After hours {after_hours:.2f} {after_hours_change:+.2f} ({after_hours_pct:+.2f}%)")
+
+            # Price chart
+            fig = px.line(stock_data, x=stock_data.index, y='Close', 
+                         title=None)
+            fig.update_layout(
+                showlegend=False,
+                xaxis_title=None,
+                yaxis_title=None,
+                margin=dict(l=0, r=0, t=0, b=0)
             )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Key metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Open", f"${stock_data['Open'].iloc[-1]:.2f}")
+                st.metric("High", f"${stock_data['High'].iloc[-1]:.2f}")
+                st.metric("Low", f"${stock_data['Low'].iloc[-1]:.2f}")
+
+            # Get additional stock info
+            ticker_info = market_data.get_ticker_info(symbol)
+            if ticker_info:
+                with col2:
+                    st.metric("Market Cap", f"{ticker_info.get('marketCap', 'N/A')}")
+                    st.metric("P/E Ratio", f"{ticker_info.get('trailingPE', 'N/A'):.2f}")
+                with col3:
+                    st.metric("Div Yield", f"{ticker_info.get('dividendYield', 0)*100:.3f}%")
 
         # Remove button
         if st.button("Remove", key=f"remove_{symbol}"):
@@ -101,10 +119,6 @@ if not st.session_state.portfolio.holdings.empty:
             # Fetch news directly
             st.info(f"Loading news for {symbol}...")
             news_data = market_data.get_news_analysis(symbol)
-
-            # Debug information
-            st.write("Debug: News data received")
-            st.write(f"Debug: Number of articles: {len(news_data.get('articles', []))}")
 
             if news_data and news_data.get('articles'):
                 for article in news_data['articles']:
@@ -121,7 +135,6 @@ if not st.session_state.portfolio.holdings.empty:
                 st.warning("No recent news available for this stock.")
         except Exception as e:
             st.error(f"Error loading news: {str(e)}")
-            st.write("Debug: Exception details", e)
 
 else:
     st.info("Add positions to your portfolio to view stock analysis")
